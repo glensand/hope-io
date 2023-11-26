@@ -36,20 +36,20 @@ namespace ikarus::proto {
         template<typename TValue>
         const TValue& as() const { return *(TValue*)get_value_internal(); }
 
-        bool write(io::stream& stream) {
-            return stream.write(type)
-                && stream.write(name)
-                && write_value(stream);
+        void write(io::stream& stream) {
+            stream.write(type);
+            stream.write(name);
+            write_value(stream);
         }
 
-        bool read(io::stream& stream){
-            return stream.read(name)
-                && read_value(stream);
+        void read(io::stream& stream){
+            stream.read(name);
+            read_value(stream);
         }
 
     protected:
-        virtual bool write_value(io::stream& stream) = 0;
-        virtual bool read_value(io::stream& stream) = 0;
+        virtual void write_value(io::stream& stream) = 0;
+        virtual void read_value(io::stream& stream) = 0;
         [[nodiscard]] virtual void* get_value_internal() const = 0;
 
         std::string name;

@@ -23,20 +23,18 @@ namespace ikarus::proto {
         const TValue& get() const { return val; }
 
     protected:
-        virtual bool write_value(io::stream& stream) override {
+        virtual void write_value(io::stream& stream) override {
+            assert(is_trivial);
             if constexpr(is_trivial) {
-                return stream.write(val);
+                stream.write(val);
             }
-            assert(false);
-            return false;
         }
 
-        virtual bool read_value(io::stream& stream) override {
+        virtual void read_value(io::stream& stream) override {
+            assert(is_trivial);
             if constexpr(is_trivial) {
-                return stream.read(val);
+                return read(val);
             }
-            assert(false);
-            return false;
         }
 
         virtual void* get_value_internal() const override {

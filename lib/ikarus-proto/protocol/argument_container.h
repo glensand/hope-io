@@ -21,22 +21,16 @@ namespace ikarus::proto {
                 delete v;
         }
 
-        bool write_values(io::stream& stream) {
-            bool success = stream.write(values.size());
+        void write_values(io::stream& stream) {
+            stream.write(values.size());
             for (auto* v : values){
-                success = v->write(stream);
-                if (!success)
-                    break;
+                v->write(stream);
             }
-            return success;
         }
 
-        bool read_values(io::stream& stream) {
-            auto read_values_internal = [&]{
-                return true;
-            };
-            std::size_t size;
-            return stream.read(size) && read_values_internal();
+        void read_values(io::stream& stream) {
+            const auto size = stream.read<std::size_t>();
+            // todo read...
         }
     protected:
         std::vector<argument*> values;

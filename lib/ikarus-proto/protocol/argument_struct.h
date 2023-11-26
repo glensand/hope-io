@@ -16,12 +16,12 @@ namespace ikarus::proto{
 
         }
 
-        virtual bool write_value(io::stream& stream) override {
-            return write_values(stream);
+        virtual void write_value(io::stream& stream) override {
+            argument_container::write_values(stream);
         }
 
-        virtual bool read_value(io::stream& stream) override {
-            return read_values(stream);
+        virtual void read_value(io::stream& stream) override {
+            argument_container::read_values(stream);
         }
 
         virtual void* get_value_internal() const override {

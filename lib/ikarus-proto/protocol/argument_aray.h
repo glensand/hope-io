@@ -34,25 +34,22 @@ namespace ikarus::proto {
         }
 
     private:
-        virtual bool write_value(io::stream& stream) {
-            bool success = true;
-            success &= stream.write(array_value_type);
-            success &= stream.write(base::val.size());
+        virtual void write_value(io::stream& stream) {
+            stream.write(array_value_type);
+            stream.write(base::val.size());
             for (const auto v : base::val) {
                 if constexpr(is_trivial){
-                    success &= stream.write(v);
+                    stream.write(v);
                 }
                 if constexpr (!is_trivial){
-                    success &= v.write_value(stream);
+                    v.write_value(stream);
                 }
-                if (!success) break;
             }
-            return success;
         }
 
-        virtual bool read_value(io::stream& stream) {
+        virtual void read_value(io::stream& stream) {
             std::size_t size { 0 };
-            bool success = stream.read(size);
+            stream.read(size);
             base::val.reserve(size);
             for (std::size_t i { 0 }; i < size && success; ++i){
                 if constexpr (is_trivial) {
