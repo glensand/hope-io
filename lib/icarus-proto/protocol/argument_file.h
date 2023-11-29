@@ -4,9 +4,8 @@
 
 #pragma once
 
-namespace ikarus::proto {
+#include "icarus-proto/protocol/argument.h"
+
+namespace icarus::proto {
 
 }
-enum class e_request{
-
-};

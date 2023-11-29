@@ -5,13 +5,14 @@
 #pragma once
 
 #include <vector>
-#include "ikarus-proto/protocol/argument.h"
+#include "icarus-proto/protocol/argument.h"
 
-namespace ikarus::proto {
+namespace icarus::proto {
 
     class argument_container {
     public:
-        argument_container(std::vector<argument*>&& in_values)
+        argument_container() = default;
+        explicit argument_container(std::vector<argument*>&& in_values)
             : values(std::move(in_values)){
 
         }

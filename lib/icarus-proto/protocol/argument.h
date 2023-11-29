@@ -8,9 +8,9 @@
 #include <string>
 #include <cassert>
 
-#include "ikarus-proto/net/stream.h"
+#include "icarus-proto/net/stream.h"
 
-namespace ikarus::proto {
+namespace icarus::proto {
 
     enum class e_argument_type : uint8_t {
         int32,
@@ -24,6 +24,7 @@ namespace ikarus::proto {
 
     class argument {
     public:
+        argument() = default;
         argument(std::string in_name, e_argument_type in_type)
             : name(std::move(in_name))
             , type(in_type){}

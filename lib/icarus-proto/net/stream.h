@@ -9,7 +9,7 @@
 #include <string>
 #include <type_traits>
 
-namespace ikarus::io {
+namespace icarus::io {
 
     class stream {
     public:

@@ -3,12 +3,16 @@
  */
 
 #pragma once
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "modernize-use-override"
 
-#include "argument_container.h"
+#include "icarus-proto/protocol/argument_container.h"
 
-namespace ikarus::proto{
+namespace icarus::proto{
 
     class argument_struct final : public argument, public argument_container {
+    public:
+        argument_struct() = default;
     private:
         argument_struct(std::string&& name, std::vector<argument*>&& args)
             : argument(std::move(name), e_argument_type::struct_value)
@@ -24,7 +28,7 @@ namespace ikarus::proto{
             argument_container::read_values(stream);
         }
 
-        virtual void* get_value_internal() const override {
+        [[nodiscard]] virtual void* get_value_internal() const override {
             return (void*)&values;
         }
 
@@ -42,7 +46,7 @@ namespace ikarus::proto{
             values.emplace_back(new TValue(std::forward<Ts>(args)...));
         }
 
-        argument* get(std::string&& name) {
+        argument_struct* get(std::string&& name) {
             return new argument_struct(std::move(name), std::move(values));
         }
 
@@ -55,3 +59,4 @@ namespace ikarus::proto{
     };
 
 }
+#pragma clang diagnostic pop

@@ -3,15 +3,19 @@
  */
 
 #pragma once
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "modernize-use-override"
 
-#include "argument.h"
+#include "icarus-proto/protocol/argument.h"
 
-namespace ikarus::proto {
+namespace icarus::proto {
 
     template<typename TValue, e_argument_type Type>
     class argument_generic : public argument {
         constexpr static bool is_trivial = std::is_trivial_v<TValue> || std::is_same_v<std::string, TValue>;
     public:
+        argument_generic() = default;
+
         argument_generic(std::string&& in_name, TValue&& in_val)
                 : argument(std::move(in_name), Type)
                 , val(std::move(in_val)) {}
@@ -33,12 +37,12 @@ namespace ikarus::proto {
         virtual void read_value(io::stream& stream) override {
             assert(is_trivial);
             if constexpr(is_trivial) {
-                return read(val);
+                return stream.read(val);
             }
         }
 
-        virtual void* get_value_internal() const override {
-            return &val;
+        [[nodiscard]] virtual void* get_value_internal() const override {
+            return (void*)(&val);
         }
 
         TValue val;
@@ -49,3 +53,5 @@ namespace ikarus::proto {
     using float64 = argument_generic<double, e_argument_type::float64>;
     using string = argument_generic<std::string, e_argument_type::string>;
 }
+
+#pragma clang diagnostic pop

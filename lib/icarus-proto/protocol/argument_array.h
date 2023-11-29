@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "ikarus-proto/protocol/argument_generic.h"
+#include "icarus-proto/protocol/argument_generic.h"
 
-namespace ikarus::proto {
+namespace icarus::proto {
 
     template<typename TValue>
     class array final : public argument_generic<std::vector<TValue>, e_argument_type::array> {
@@ -15,13 +15,14 @@ namespace ikarus::proto {
                 || std::is_same_v<int32_t , TValue>
                 || std::is_same_v<uint64_t , TValue>
                 || std::is_same_v<std::string, TValue>
-                || std::is_same_v<argument*, TValue>,
+                || std::is_base_of_v<argument, std::remove_pointer_t<TValue>>,
                 "Only specified types are allowed"
             );
 
         using base = argument_generic<std::vector<TValue>, e_argument_type::array>;
         constexpr static bool is_trivial = !std::is_same_v<argument*, TValue>;
     public:
+        array() = default;
         array(std::string in_name, std::vector<TValue> in_value, e_argument_type type)
                 : base(std::move(in_name), std::move(in_value))
                 , array_value_type(type) {}
@@ -51,15 +52,12 @@ namespace ikarus::proto {
             std::size_t size { 0 };
             stream.read(size);
             base::val.reserve(size);
-            for (std::size_t i { 0 }; i < size && success; ++i){
+            for (std::size_t i { 0 }; i < size; ++i){
                 if constexpr (is_trivial) {
-                    TValue value;
-                    success &= stream.read(value);
-                    base::val.emplace_back(value);
+                    base::val.emplace_back(stream.read<TValue>());
                 }
                 // todo read non trivial vals
             }
-            return success;
         }
 
         e_argument_type array_value_type;
