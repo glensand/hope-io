@@ -24,7 +24,9 @@ namespace icarus::proto {
 
     class argument {
     public:
-        argument() = default;
+        explicit argument(e_argument_type in_type)
+            : type(in_type){}
+
         argument(std::string in_name, e_argument_type in_type)
             : name(std::move(in_name))
             , type(in_type){}

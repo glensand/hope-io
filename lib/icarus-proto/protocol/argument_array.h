@@ -22,7 +22,9 @@ namespace icarus::proto {
         using base = argument_generic<std::vector<TValue>, e_argument_type::array>;
         constexpr static bool is_trivial = !std::is_same_v<argument*, TValue>;
     public:
-        array() = default;
+        explicit array(e_argument_type in_array_value_type)
+            : array_value_type(in_array_value_type){}
+
         array(std::string in_name, std::vector<TValue> in_value, e_argument_type type)
                 : base(std::move(in_name), std::move(in_value))
                 , array_value_type(type) {}
@@ -49,14 +51,18 @@ namespace icarus::proto {
         }
 
         virtual void read_value(io::stream& stream) {
-            std::size_t size { 0 };
-            stream.read(size);
+            auto size = stream.read<std::size_t>();
             base::val.reserve(size);
             for (std::size_t i { 0 }; i < size; ++i){
                 if constexpr (is_trivial) {
-                    base::val.emplace_back(stream.read<TValue>());
+                    auto v = stream.read<TValue>();
+                    base::val.emplace_back(v);
                 }
-                // todo read non trivial vals
+                if constexpr (!is_trivial) {
+                    auto* argument = new TValue();
+                    base::val.emplace_back(argument);
+                    argument->read_value(stream);
+                }
             }
         }
 

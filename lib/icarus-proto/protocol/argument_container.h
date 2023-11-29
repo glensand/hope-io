@@ -4,8 +4,10 @@
 
 #pragma once
 
-#include <vector>
 #include "icarus-proto/protocol/argument.h"
+#include "icarus-proto/protocol/argument_factory.h"
+
+#include <vector>
 
 namespace icarus::proto {
 
@@ -31,7 +33,9 @@ namespace icarus::proto {
 
         void read_values(io::stream& stream) {
             const auto size = stream.read<std::size_t>();
-            // todo read...
+            for (std::size_t i{ 0 }; i < size; ++i){
+                values.emplace_back(argument_factory::serialize(stream));
+            }
         }
     protected:
         std::vector<argument*> values;

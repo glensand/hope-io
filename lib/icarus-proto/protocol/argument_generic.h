@@ -14,7 +14,8 @@ namespace icarus::proto {
     class argument_generic : public argument {
         constexpr static bool is_trivial = std::is_trivial_v<TValue> || std::is_same_v<std::string, TValue>;
     public:
-        argument_generic() = default;
+        argument_generic()
+            : argument(Type){}
 
         argument_generic(std::string&& in_name, TValue&& in_val)
                 : argument(std::move(in_name), Type)

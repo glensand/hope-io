@@ -12,7 +12,9 @@ namespace icarus::proto{
 
     class argument_struct final : public argument, public argument_container {
     public:
-        argument_struct() = default;
+        argument_struct()
+            : argument(e_argument_type::struct_value){}
+
     private:
         argument_struct(std::string&& name, std::vector<argument*>&& args)
             : argument(std::move(name), e_argument_type::struct_value)

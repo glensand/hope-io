@@ -12,5 +12,10 @@ file(GLOB CL_HEADERS
     icarus-proto/net/*.h
 )
 
-add_library(icarus-proto INTERFACE ${CL_HEADERS})
-target_include_directories(icarus-proto INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+file(GLOB CL_SOURCES
+    icarus-proto/protocol/*.cpp
+    icarus-proto/net/*.cpp
+)
+
+add_library(icarus-proto STATIC ${CL_HEADERS} ${CL_SOURCES})
+target_include_directories(icarus-proto PUBLIC ../lib)
