@@ -1,7 +1,10 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
-
 #pragma once
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "modernize-use-override"
@@ -12,6 +15,8 @@ namespace icarus::proto{
 
     class argument_struct final : public argument, public argument_container {
     public:
+        constexpr static e_argument_type type = e_argument_type::struct_value;
+
         argument_struct()
             : argument(e_argument_type::struct_value){}
 
@@ -23,11 +28,11 @@ namespace icarus::proto{
         }
 
         virtual void write_value(io::stream& stream) override {
-            argument_container::write_values(stream);
+            write_values(stream);
         }
 
         virtual void read_value(io::stream& stream) override {
-            argument_container::read_values(stream);
+            read_values(stream);
         }
 
         [[nodiscard]] virtual void* get_value_internal() const override {

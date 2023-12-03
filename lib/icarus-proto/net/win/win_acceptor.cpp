@@ -26,7 +26,9 @@ namespace {
 
     class win_acceptor final : public icarus::io::acceptor {
     public:
-        win_acceptor() = default;
+        win_acceptor() {
+            icarus::io::win::init();
+        }
 
     private:
         virtual void run(std::string_view port, on_new_connection_t&& in_on_new_connection) override {

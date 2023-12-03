@@ -5,10 +5,10 @@
  * You should have received a copy of the MIT license with
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
-#pragma once
 
-#include "icarus-proto/protocol/argument.h"
+#include "gtest/gtest.h"
 
-namespace icarus::proto {
-
+int main(int argc, char* argv[]) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

@@ -1,5 +1,9 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
 #pragma once
@@ -14,6 +18,9 @@ namespace icarus::proto {
     class argument_generic : public argument {
         constexpr static bool is_trivial = std::is_trivial_v<TValue> || std::is_same_v<std::string, TValue>;
     public:
+
+        constexpr static e_argument_type type = Type;
+
         argument_generic()
             : argument(Type){}
 

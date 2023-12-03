@@ -1,5 +1,9 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
 #pragma once
@@ -24,7 +28,7 @@ namespace icarus::proto {
                 delete v;
         }
 
-        void write_values(io::stream& stream) {
+        void write_values(io::stream& stream) const {
             stream.write(values.size());
             for (auto* v : values){
                 v->write(stream);

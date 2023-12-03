@@ -1,5 +1,9 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
 #pragma once
@@ -24,6 +28,7 @@ namespace icarus::proto {
         using base = argument_generic<std::vector<TValue>, e_argument_type::array>;
         constexpr static bool is_trivial = !std::is_same_v<argument*, TValue>;
     public:
+
         explicit array(e_argument_type in_array_value_type)
             : array_value_type(in_array_value_type){}
 
