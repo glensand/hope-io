@@ -26,34 +26,53 @@ namespace icarus::proto {
             );
 
         using base = argument_generic<std::vector<TValue>, e_argument_type::array>;
-        constexpr static bool is_trivial = !std::is_same_v<argument*, TValue>;
+        constexpr static bool is_trivial = !std::is_base_of_v<argument, std::remove_pointer_t<TValue>>;
     public:
 
-        explicit array(e_argument_type in_array_value_type)
-            : array_value_type(in_array_value_type){}
+        explicit array() = default;
+        array(std::string in_name, std::vector<TValue> in_value)
+                : base(std::move(in_name), std::move(in_value)) {
+            
+        }
 
-        array(std::string in_name, std::vector<TValue> in_value, e_argument_type type)
-                : base(std::move(in_name), std::move(in_value))
-                , array_value_type(type) {}
-
-        virtual ~array() override
-        {
+        virtual ~array() override {
             if constexpr (std::is_same_v<TValue, argument*>){
                 for (auto v : base::val)
                     delete v;
             }
         }
 
-    private:
-        virtual void write_value(io::stream& stream) override {
+        virtual void write(io::stream& stream) override {
+            stream.write(argument::argument_type);
             stream.write(array_value_type);
-            stream.write(base::val.size());
-            for (const auto v : base::val) {
+            stream.write(argument::name);
+            write_value(stream);
+        }
+
+    private:
+        constexpr static e_argument_type get_type()  {
+            using clear_t = std::decay_t<TValue>;
+            if constexpr (std::is_same_v<clear_t, int32_t>)
+                return e_argument_type::int32;
+            if constexpr (std::is_same_v<clear_t, uint64_t>)
+                return e_argument_type::uint64;
+            if constexpr (std::is_same_v<clear_t, std::string>)
+                return e_argument_type::string;
+            if constexpr (std::is_base_of_v<argument, TValue>)
+                return std::remove_all_extents_t<TValue>::type;
+            if constexpr (std::is_same_v<clear_t, double>)
+                return e_argument_type::float64;
+            return e_argument_type::count;
+        }
+
+        virtual void write_value(io::stream& stream) override {
+            stream.write((std::size_t)base::val.size());
+            for (const auto& v : base::val) {
                 if constexpr(is_trivial){
                     stream.write(v);
                 }
                 if constexpr (!is_trivial){
-                    v.write_value(stream);
+                    v->write_value(stream);
                 }
             }
         }
@@ -67,13 +86,13 @@ namespace icarus::proto {
                     base::val.emplace_back(v);
                 }
                 if constexpr (!is_trivial) {
-                    auto* argument = new TValue();
+                    auto* argument = new std::remove_pointer_t<TValue>();
                     base::val.emplace_back(argument);
                     argument->read_value(stream);
                 }
             }
         }
 
-        e_argument_type array_value_type;
+        e_argument_type array_value_type{ get_type() };
     };
 }

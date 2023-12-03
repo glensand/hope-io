@@ -20,19 +20,19 @@ namespace icarus::proto{
         argument_struct()
             : argument(e_argument_type::struct_value){}
 
-    private:
-        argument_struct(std::string&& in_name, std::vector<argument*>&& args)
-            : argument(std::move(in_name), e_argument_type::struct_value)
-            , argument_container(std::move(args)){
-
-        }
-
         virtual void write_value(io::stream& stream) override {
             write_values(stream);
         }
 
         virtual void read_value(io::stream& stream) override {
             read_values(stream);
+        }
+
+    private:
+        argument_struct(std::string&& in_name, std::vector<argument*>&& args)
+            : argument(std::move(in_name), e_argument_type::struct_value)
+            , argument_container(std::move(args)){
+
         }
 
         [[nodiscard]] virtual void* get_value_internal() const override {

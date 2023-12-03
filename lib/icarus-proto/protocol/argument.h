@@ -23,32 +23,33 @@ namespace icarus::proto {
         array,
         struct_value,
         file,
+        count
     };
 
     class argument {
     public:
         explicit argument(e_argument_type in_type)
-            : type(in_type){}
+            : argument_type(in_type){}
 
         argument(std::string in_name, e_argument_type in_type)
             : name(std::move(in_name))
-            , type(in_type){}
+            , argument_type(in_type){}
 
         virtual ~argument() = default;
 
         [[nodiscard]] const std::string& get_name() const { return name; }
-        [[nodiscard]] e_argument_type get_type() const { return type; }
+        [[nodiscard]] e_argument_type get_type() const { return argument_type; }
 
         template<typename TValue>
         const TValue& as() const { return *(TValue*)get_value_internal(); }
 
-        void write(io::stream& stream) {
-            stream.write(type);
+        virtual void write(io::stream& stream) {
+            stream.write(argument_type);
             stream.write(name);
             write_value(stream);
         }
 
-        void read(io::stream& stream){
+        virtual void read(io::stream& stream) {
             stream.read(name);
             read_value(stream);
         }
@@ -59,6 +60,6 @@ namespace icarus::proto {
         [[nodiscard]] virtual void* get_value_internal() const = 0;
 
         std::string name;
-        e_argument_type type;
+        e_argument_type argument_type;
     };
 }
