@@ -16,8 +16,8 @@ namespace icarus::proto{
             : argument(e_argument_type::struct_value){}
 
     private:
-        argument_struct(std::string&& name, std::vector<argument*>&& args)
-            : argument(std::move(name), e_argument_type::struct_value)
+        argument_struct(std::string&& in_name, std::vector<argument*>&& args)
+            : argument(std::move(in_name), e_argument_type::struct_value)
             , argument_container(std::move(args)){
 
         }
@@ -46,6 +46,7 @@ namespace icarus::proto{
         template<typename TValue, typename... Ts>
         struct_builder& add(Ts&&... args) {
             values.emplace_back(new TValue(std::forward<Ts>(args)...));
+            return *this;
         }
 
         argument_struct* get(std::string&& name) {

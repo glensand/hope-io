@@ -25,7 +25,7 @@ namespace icarus::proto {
                 : argument(std::move(in_name), Type)
                 , val(in_val) {}
 
-        const TValue& get() const { return val; }
+        [[nodiscard]] const TValue& get() const { return val; }
 
     protected:
         virtual void write_value(io::stream& stream) override {

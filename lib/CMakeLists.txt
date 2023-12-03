@@ -10,11 +10,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out)
 file(GLOB CL_HEADERS
     icarus-proto/protocol/*.h
     icarus-proto/net/*.h
+    icarus-proto/net/win/*.h
 )
 
 file(GLOB CL_SOURCES
     icarus-proto/protocol/*.cpp
     icarus-proto/net/*.cpp
+    icarus-proto/net/win/*.cpp
 )
 
 add_library(icarus-proto STATIC ${CL_HEADERS} ${CL_SOURCES})

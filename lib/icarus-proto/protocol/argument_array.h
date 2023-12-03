@@ -6,6 +6,8 @@
 
 #include "icarus-proto/protocol/argument_generic.h"
 
+#include <vector>
+
 namespace icarus::proto {
 
     template<typename TValue>
@@ -29,7 +31,8 @@ namespace icarus::proto {
                 : base(std::move(in_name), std::move(in_value))
                 , array_value_type(type) {}
 
-        virtual ~array(){
+        virtual ~array() override
+        {
             if constexpr (std::is_same_v<TValue, argument*>){
                 for (auto v : base::val)
                     delete v;
@@ -37,7 +40,7 @@ namespace icarus::proto {
         }
 
     private:
-        virtual void write_value(io::stream& stream) {
+        virtual void write_value(io::stream& stream) override {
             stream.write(array_value_type);
             stream.write(base::val.size());
             for (const auto v : base::val) {
@@ -50,7 +53,7 @@ namespace icarus::proto {
             }
         }
 
-        virtual void read_value(io::stream& stream) {
+        virtual void read_value(io::stream& stream) override {
             auto size = stream.read<std::size_t>();
             base::val.reserve(size);
             for (std::size_t i { 0 }; i < size; ++i){

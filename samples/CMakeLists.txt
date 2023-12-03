@@ -15,4 +15,4 @@ file(GLOB SAMPLE_SOURSES
 
 add_executable(sample ${SAMPLE_HEADERS} ${SAMPLE_SOURSES})
 target_link_libraries(icarus-proto)
-target_include_directories(sample INTERFACE ../lib)
+target_include_directories(sample PUBLIC ../lib)

@@ -15,11 +15,8 @@ namespace icarus::io {
     public:
         virtual ~stream() = default;
 
-        virtual void connect(std::string_view ip, std::string_view port) = 0;
-        virtual void disconnect() = 0;
-
-        virtual void write(const void *data, std::size_t length) = 0;
-        virtual void read(void *data, std::size_t length) = 0;
+        virtual std::size_t write(const void *data, std::size_t length) = 0;
+        virtual std::size_t read(void *data, std::size_t length) = 0;
 
         template<typename TValue>
         void write(const TValue &val) {
