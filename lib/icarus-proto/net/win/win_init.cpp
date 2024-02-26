@@ -1,15 +1,13 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
- */
+#include "icarus-proto/coredefs.h"
 
-#pragma once
+#ifdef ICARUS_WIN
 
-#include "win_init.h"
+#include "icarus-proto/net/init.h"
 
 #include <winsock2.h>
 #include <stdexcept>
 
-namespace icarus::io::win {
+namespace icarus::io {
 
     static bool initialized{ false };
 
@@ -30,3 +28,5 @@ namespace icarus::io::win {
     }
 
 }
+
+#endif

@@ -1,6 +1,6 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
- */
+#include "icarus-proto/coredefs.h"
+
+#ifdef ICARUS_WIN
 
 #define WIN32_LEAN_AND_MEAN
 
@@ -16,6 +16,7 @@
 
 #include "icarus-proto/net/stream.h"
 #include "icarus-proto/net/win/win_init.h"
+#include "icarus-proto/factory.h"
 
 namespace {
 
@@ -124,8 +125,10 @@ namespace {
 
 namespace icarus::io {
 
-    stream* create_win_stream(unsigned long long socket = 0) {
+    stream* create_stream(unsigned long long socket) {
         return new win_stream(socket);
     }
 
 }
+
+#endif

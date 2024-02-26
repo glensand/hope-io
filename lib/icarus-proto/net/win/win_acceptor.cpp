@@ -1,10 +1,12 @@
-/*
- * Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
- */
+#include "icarus-proto/coredefs.h"
+
+#ifdef ICARUS_WIN
 
 #include "win_acceptor.h"
 #include "icarus-proto/net/win/win_stream.h"
 #include "icarus-proto/net/acceptor.h"
+#include "icarus-proto/coredefs.h"
+#include "icarus-proto/factory.h"
 
 #undef UNICODE
 
@@ -34,32 +36,24 @@ namespace {
         virtual void run(std::string_view port, on_new_connection_t&& in_on_new_connection) override {
             on_new_connection = std::move(in_on_new_connection);
             connect(port);
-            state = e_state::listen_sync;
             while(active.load(std::memory_order_acquire)) {
-                listen();
-            }
-        }
-
-        virtual void run_async(std::string_view port, on_new_connection_t&& in_on_new_connection, on_error_t&& in_on_error) override {
-            on_new_connection = std::move(in_on_new_connection);
-            connect(port);
-            listen_thread = std::thread([this, in_on_error] {
-                while (active.load(std::memory_order_acquire)) {
-                    try {
-                        listen();
-                    }
-                    catch (const std::exception& e) {
-                        in_on_error(e);
-                        return;
-                    }
+                if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
+                    // TODO:: add error
+                    throw std::runtime_error("Win acceptor: Fail while listening");
                 }
-            });
-            state = e_state::listen_async;
+
+                // Accept a client socket
+                const auto new_socket = accept(listen_socket, nullptr, nullptr);
+                if (new_socket == INVALID_SOCKET) {
+                    throw std::runtime_error("Win acceptor: accept failed");
+                }
+
+                on_new_connection(icarus::io::create_win_stream(new_socket));
+            }
         }
 
         virtual void stop() override {
             active.store(false, std::memory_order_release);
-            state = e_state::inactive;
             closesocket(listen_socket);
         }
 
@@ -96,41 +90,19 @@ namespace {
             freeaddrinfo(result);
         }
 
-        void listen() const {
-            if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
-                // TODO:: add error
-                throw std::runtime_error("Win acceptor: Fail while listening");
-            }
-
-            // Accept a client socket
-            const auto new_socket = accept(listen_socket, nullptr, nullptr);
-            if (new_socket == INVALID_SOCKET) {
-                throw std::runtime_error("Win acceptor: accept failed");
-            }
-
-            on_new_connection(icarus::io::create_win_stream(new_socket));
-        }
-
-        enum class e_state {
-            inactive,
-            listen_sync,
-            listen_async,
-        };
-
-        std::thread listen_thread;
         on_new_connection_t on_new_connection;
         std::atomic<bool> active{ false };
         SOCKET listen_socket{ INVALID_SOCKET };
-
-        e_state state{ e_state::inactive };
     };
 
 }
 
 namespace icarus::io {
 
-    acceptor* create_win_acceptor() {
+    acceptor* create_acceptor() {
         return new win_acceptor;
     }
 
 }
+
+#endif

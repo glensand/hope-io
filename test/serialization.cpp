@@ -31,7 +31,6 @@ TEST(Serialization, PrimitiveTypes)
     ASSERT_TRUE(perform_trivial_test<uint64>(10u));
 }
 
-
 TEST(Serialization, Array_int)
 {
     std::vector<int32_t> ar;
