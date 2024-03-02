@@ -17,11 +17,9 @@ namespace icarus::io {
 
     class acceptor {
     public:
-        using on_new_connection_t = std::function<void(class stream*)>;
 
         virtual ~acceptor() = default;
-        virtual void run(std::string_view port, on_new_connection_t&& on_new_connection) = 0;
-        virtual void stop() = 0;
+        virtual class stream* accept() = 0;
     };
 
 }

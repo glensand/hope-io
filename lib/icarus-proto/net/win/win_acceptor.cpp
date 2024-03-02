@@ -1,3 +1,11 @@
+/* Copyright (C) 2023 - 2024 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
+ */
+
 #include "icarus-proto/coredefs.h"
 
 #ifdef ICARUS_WIN
@@ -28,33 +36,29 @@ namespace {
 
     class win_acceptor final : public icarus::io::acceptor {
     public:
-        win_acceptor() {
+        win_acceptor(std::string_view port) {
             icarus::io::win::init();
+            connect(port);
+        }
+
+        virtual ~win_acceptor() override {
+            closesocket(listen_socket);
         }
 
     private:
-        virtual void run(std::string_view port, on_new_connection_t&& in_on_new_connection) override {
-            on_new_connection = std::move(in_on_new_connection);
-            connect(port);
-            while(active.load(std::memory_order_acquire)) {
-                if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
-                    // TODO:: add error
-                    throw std::runtime_error("Win acceptor: Fail while listening");
-                }
-
-                // Accept a client socket
-                const auto new_socket = accept(listen_socket, nullptr, nullptr);
-                if (new_socket == INVALID_SOCKET) {
-                    throw std::runtime_error("Win acceptor: accept failed");
-                }
-
-                on_new_connection(icarus::io::create_win_stream(new_socket));
+        virtual void accept() override {
+            if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
+                // TODO:: add error
+                throw std::runtime_error("Win acceptor: Fail while listening");
             }
-        }
 
-        virtual void stop() override {
-            active.store(false, std::memory_order_release);
-            closesocket(listen_socket);
+            // Accept a client socket
+            const auto new_socket = accept(listen_socket, nullptr, nullptr);
+            if (new_socket == INVALID_SOCKET) {
+                throw std::runtime_error("Win acceptor: accept failed");
+            }
+
+            return icarus::io::create_win_stream(new_socket);
         }
 
         void connect(std::string_view port) {
@@ -90,8 +94,6 @@ namespace {
             freeaddrinfo(result);
         }
 
-        on_new_connection_t on_new_connection;
-        std::atomic<bool> active{ false };
         SOCKET listen_socket{ INVALID_SOCKET };
     };
 
@@ -99,8 +101,8 @@ namespace {
 
 namespace icarus::io {
 
-    acceptor* create_acceptor() {
-        return new win_acceptor;
+    acceptor* create_acceptor(std::size_t port) {
+        return new win_acceptor(std::to_string(port));
     }
 
 }

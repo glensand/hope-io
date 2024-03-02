@@ -1,4 +1,4 @@
-/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 - 2024 Gleb Bezborodov - All Rights Reserved
  * You may use, distribute and modify this code under the
  * terms of the MIT license.
  *
@@ -15,7 +15,7 @@ class mock_stream final : public icarus::io::stream {
 public:
     mock_stream() = default;
 
-    virtual void connect(std::string_view ip, std::string_view port) override {}
+    virtual void connect(std::string_view ip, std::size_t port) override {}
     virtual void disconnect() override {}
 
     virtual void write(const void* data, std::size_t length) override {

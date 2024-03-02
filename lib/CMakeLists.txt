@@ -11,12 +11,14 @@ file(GLOB CL_HEADERS
     icarus-proto/protocol/*.h
     icarus-proto/net/*.h
     icarus-proto/net/win/*.h
+    icarus-proto/net/nix/*.h
 )
 
 file(GLOB CL_SOURCES
     icarus-proto/protocol/*.cpp
     icarus-proto/net/*.cpp
     icarus-proto/net/win/*.cpp
+    icarus-proto/net/nix/*.cpp
 )
 
 add_library(icarus-proto STATIC ${CL_HEADERS} ${CL_SOURCES})

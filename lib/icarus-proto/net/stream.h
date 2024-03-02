@@ -1,4 +1,4 @@
-/* Copyright (C) 2023 Gleb Bezborodov - All Rights Reserved
+/* Copyright (C) 2023 - 2024 Gleb Bezborodov - All Rights Reserved
  * You may use, distribute and modify this code under the
  * terms of the MIT license.
  *
@@ -18,7 +18,7 @@ namespace icarus::io {
     public:
         virtual ~stream() = default;
 
-        virtual void connect(std::string_view ip, std::string_view port) = 0;
+        virtual void connect(std::string_view ip, std::size_t port) = 0;
         virtual void disconnect() = 0;
 
         virtual void write(const void *data, std::size_t length) = 0;

@@ -8,11 +8,9 @@
 
 #pragma once
 
-#include "icarus-proto/coredefs.h"
-
 namespace icarus::io {
 
-    class acceptor* create_acceptor();
+    class acceptor* create_acceptor(std::string_view port);
     class stream* create_stream(unsigned long long socket = 0);
 
 }

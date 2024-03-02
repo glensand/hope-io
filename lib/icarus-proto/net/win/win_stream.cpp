@@ -1,3 +1,11 @@
+/* Copyright (C) 2023 - 2024 Gleb Bezborodov - All Rights Reserved
+ * You may use, distribute and modify this code under the
+ * terms of the MIT license.
+ *
+ * You should have received a copy of the MIT license with
+ * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
+ */
+
 #include "icarus-proto/coredefs.h"
 
 #ifdef ICARUS_WIN
@@ -34,7 +42,7 @@ namespace {
         }
 
     private:
-        virtual void connect(const std::string_view ip, const std::string_view port) override {
+        virtual void connect(const std::string_view ip, std::size_t port) override {
             // just clear entire structures
             if (socket != INVALID_SOCKET)
                 throw std::runtime_error("Stream had already been connected");
@@ -47,7 +55,7 @@ namespace {
             hints_addr_info.ai_protocol = IPPROTO_TCP;
 
             // Resolve the server address and port
-            const int32_t result = getaddrinfo(ip.data(), port.data(), &hints_addr_info, &result_addr_info);
+            const int32_t result = getaddrinfo(ip.data(), std::to_string(port).c_str(), &hints_addr_info, &result_addr_info);
             struct free_address_info final {  // NOLINT(cppcoreguidelines-special-member-functions)
                 ~free_address_info() {
                     if (addr_info) {
