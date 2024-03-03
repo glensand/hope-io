@@ -24,7 +24,7 @@
 
 #include "icarus-proto/net/stream.h"
 #include "icarus-proto/net/init.h"
-#include "icarus-proto/factory.h"
+#include "icarus-proto/net/factory.h"
 
 namespace {
 

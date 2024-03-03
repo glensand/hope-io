@@ -14,7 +14,8 @@
 #include "icarus-proto/net/stream.h"
 #include "icarus-proto/net/acceptor.h"
 #include "icarus-proto/coredefs.h"
-#include "icarus-proto/factory.h"
+#include "icarus-proto/net/factory.h"
+#include "icarus-proto/net/init.h"
 
 #undef UNICODE
 
@@ -28,8 +29,6 @@
 #include <thread>
 #include <atomic>
 
-#include "win_init.h"
-
 #pragma comment (lib, "Ws2_32.lib")
 
 namespace {
@@ -42,18 +41,18 @@ namespace {
         }
 
         virtual ~win_acceptor() override {
-            closesocket(listen_socket);
+            closesocket(m_listen_socket);
         }
 
     private:
-        virtual hopd::io::stream* accept() override {
-            if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
+        virtual hope::io::stream* accept() override {
+            if (const auto connected = ::listen(m_listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
                 // TODO:: add error
                 throw std::runtime_error("Win acceptor: Fail while listening");
             }
 
             // Accept a client socket
-            const auto new_socket = accept(listen_socket, nullptr, nullptr);
+            const auto new_socket = ::accept(m_listen_socket, nullptr, nullptr);
             if (new_socket == INVALID_SOCKET) {
                 throw std::runtime_error("Win acceptor: accept failed");
             }
@@ -76,17 +75,17 @@ namespace {
                 throw std::runtime_error("Win Acceptor: Cannot resolve address and port");
             }
 
-            listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-            if (listen_socket == INVALID_SOCKET) {
+            m_listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+            if (m_listen_socket == INVALID_SOCKET) {
                 freeaddrinfo(result);
                 // TODO:: add error
                 throw std::runtime_error("Win acceptor: Cannot create socket");
             }
 
             // Setup the TCP listening socket
-            if (const auto bound = bind(listen_socket, result->ai_addr, (int)result->ai_addrlen); bound == SOCKET_ERROR) {
+            if (const auto bound = bind(m_listen_socket, result->ai_addr, (int)result->ai_addrlen); bound == SOCKET_ERROR) {
                 freeaddrinfo(result);
-                closesocket(listen_socket);
+                closesocket(m_listen_socket);
                 // TODO:: add error
                 throw std::runtime_error("Win acceptor: Cannot bind socket");
             }
@@ -94,7 +93,7 @@ namespace {
             freeaddrinfo(result);
         }
 
-        SOCKET listen_socket{ INVALID_SOCKET };
+        SOCKET m_listen_socket{ INVALID_SOCKET };
     };
 
 }
