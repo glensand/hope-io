@@ -23,7 +23,7 @@
 #include <stdexcept>
 
 #include "icarus-proto/net/stream.h"
-#include "icarus-proto/net/win/win_init.h"
+#include "icarus-proto/net/init.h"
 #include "icarus-proto/factory.h"
 
 namespace {

@@ -10,8 +10,8 @@
 
 #ifdef ICARUS_WIN
 
-#include "win_acceptor.h"
-#include "icarus-proto/net/win/win_stream.h"
+#include "icarus-proto/net/acceptor.h"
+#include "icarus-proto/net/stream.h"
 #include "icarus-proto/net/acceptor.h"
 #include "icarus-proto/coredefs.h"
 #include "icarus-proto/factory.h"
