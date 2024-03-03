@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include "icarus-proto/protocol/argument_generic.h"
+#include "icarus-proto/proto/argument_generic.h"
 
 #include <vector>
 
-namespace icarus::proto {
+namespace hope::proto {
 
     template<typename TValue>
     class array final : public argument_generic<std::vector<TValue>, e_argument_type::array> {

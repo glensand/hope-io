@@ -28,7 +28,7 @@
 
 namespace {
 
-    class nix_stream final : public icarus::io::stream {
+    class nix_stream final : public hope::io::stream {
     public:
         explicit nix_stream(unsigned long long in_socket) {
             if (in_socket != 0)
@@ -85,7 +85,7 @@ namespace {
 
 }
 
-namespace icarus::io {
+namespace hope::io {
 
     stream* create_stream(unsigned long long socket){
         return new nix_stream(socket);

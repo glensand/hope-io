@@ -9,15 +9,15 @@
 #include "mock_stream.h"
 #include "gtest/gtest.h"
 
-#include "icarus-proto/protocol/argument.h"
-#include "icarus-proto/protocol/argument_container.h"
-#include "icarus-proto/protocol/argument_file.h"
-#include "icarus-proto/protocol/argument_struct.h"
-#include "icarus-proto/protocol/argument_array.h"
-#include "icarus-proto/protocol/argument_factory.h"
-#include "icarus-proto/protocol/message.h"
+#include "icarus-proto/proto/argument.h"
+#include "icarus-proto/proto/argument_container.h"
+#include "icarus-proto/proto/argument_file.h"
+#include "icarus-proto/proto/argument_struct.h"
+#include "icarus-proto/proto/argument_array.h"
+#include "icarus-proto/proto/argument_factory.h"
+#include "icarus-proto/proto/message.h"
 
-using namespace icarus::proto;
+using namespace hope::proto;
 
 template<typename TClass, typename TValue>
 bool perform_trivial_test(const TValue& val) {

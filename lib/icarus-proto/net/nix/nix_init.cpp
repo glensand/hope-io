@@ -12,7 +12,7 @@
 
 #include "icarus-proto/net/init.h"
 
-namespace icarus::io {
+namespace hope::io {
 
     void init() {
 

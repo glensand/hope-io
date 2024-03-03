@@ -9,9 +9,9 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "modernize-use-override"
 
-#include "icarus-proto/protocol/argument_container.h"
+#include "icarus-proto/proto/argument_container.h"
 
-namespace icarus::proto{
+namespace hope::proto{
 
     class argument_struct final : public argument, public argument_container {
     public:

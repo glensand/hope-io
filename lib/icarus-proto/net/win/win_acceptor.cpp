@@ -34,10 +34,10 @@
 
 namespace {
 
-    class win_acceptor final : public icarus::io::acceptor {
+    class win_acceptor final : public hope::io::acceptor {
     public:
         win_acceptor(std::string_view port) {
-            icarus::io::win::init();
+            hope::io::init();
             connect(port);
         }
 
@@ -46,7 +46,7 @@ namespace {
         }
 
     private:
-        virtual void accept() override {
+        virtual hopd::io::stream* accept() override {
             if (const auto connected = ::listen(listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
                 // TODO:: add error
                 throw std::runtime_error("Win acceptor: Fail while listening");
@@ -58,7 +58,7 @@ namespace {
                 throw std::runtime_error("Win acceptor: accept failed");
             }
 
-            return icarus::io::create_win_stream(new_socket);
+            return hope::io::create_stream(new_socket);
         }
 
         void connect(std::string_view port) {
@@ -99,7 +99,7 @@ namespace {
 
 }
 
-namespace icarus::io {
+namespace hope::io {
 
     acceptor* create_acceptor(std::size_t port) {
         return new win_acceptor(std::to_string(port));

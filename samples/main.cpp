@@ -6,13 +6,13 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/protocol/argument.h"
-#include "icarus-proto/protocol/argument_container.h"
-#include "icarus-proto/protocol/argument_file.h"
-#include "icarus-proto/protocol/argument_struct.h"
-#include "icarus-proto/protocol/argument_array.h"
-#include "icarus-proto/protocol/argument_factory.h"
-#include "icarus-proto/protocol/message.h"
+#include "icarus-proto/proto/argument.h"
+#include "icarus-proto/proto/argument_container.h"
+#include "icarus-proto/proto/argument_file.h"
+#include "icarus-proto/proto/argument_struct.h"
+#include "icarus-proto/proto/argument_array.h"
+#include "icarus-proto/proto/argument_factory.h"
+#include "icarus-proto/proto/message.h"
 #include "icarus-proto/net/stream.h"
 #include "icarus-proto/net/acceptor.h"
 #include "icarus-proto/net/factory.h"
@@ -24,25 +24,25 @@ struct message final {
     std::string text;
 
     // todo:: make it more clear
-    void send(icarus::io::stream& stream){
-        auto proto_msg = std::unique_ptr<icarus::proto::argument>(
-        icarus::proto::struct_builder::create()
-            .add<icarus::proto::string>("name", name)
-            .add<icarus::proto::string>("text", text)
+    void send(hope::io::stream& stream){
+        auto proto_msg = std::unique_ptr<hope::proto::argument>(
+        hope::proto::struct_builder::create()
+            .add<hope::proto::string>("name", name)
+            .add<hope::proto::string>("text", text)
             .get("message"));
         proto_msg->write(stream);
     }
 
-    void recv(icarus::io::stream& stream) {
-        auto proto_msg = std::unique_ptr<icarus::proto::argument_struct>((icarus::proto::argument_struct*)
-                icarus::proto::argument_factory::serialize(stream));
+    void recv(hope::io::stream& stream) {
+        auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
+                hope::proto::argument_factory::serialize(stream));
         name = proto_msg->field<std::string>("name");
         text = proto_msg->field<std::string>("text");
     }
 };
 
 void run_client(const std::string& name) {
-    auto* stream = icarus::io::create_stream();
+    auto* stream = hope::io::create_stream();
     try {
         stream->connect("localhost", 1338);
     }
@@ -60,7 +60,7 @@ void run_client(const std::string& name) {
 }
 
 void run_server() {
-    auto* acceptor = icarus::io::create_acceptor(1338);
+    auto* acceptor = hope::io::create_acceptor(1338);
     auto* connection = acceptor->accept();
     message msg;
     std::cout << "listen\n";

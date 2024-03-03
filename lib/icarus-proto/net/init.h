@@ -8,7 +8,7 @@
 
 #pragma once
 
-namespace icarus::io {
+namespace hope::io {
 
     void init();
     void deinit();

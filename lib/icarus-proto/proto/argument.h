@@ -13,7 +13,7 @@
 
 #include "icarus-proto/net/stream.h"
 
-namespace icarus::proto {
+namespace hope::proto {
 
     enum class e_argument_type : uint8_t {
         int32,

@@ -8,7 +8,7 @@
 
 #pragma once
 
-namespace icarus::io {
+namespace hope::io {
 
     class acceptor* create_acceptor(unsigned long long port);
     class stream* create_stream(unsigned long long socket = 0);

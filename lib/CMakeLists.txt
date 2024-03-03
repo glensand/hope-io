@@ -8,14 +8,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out)
 
 file(GLOB CL_HEADERS
-    icarus-proto/protocol/*.h
+    icarus-proto/proto/*.h
+    icarus-proto/proto2/*.h
     icarus-proto/net/*.h
     icarus-proto/net/win/*.h
     icarus-proto/net/nix/*.h
 )
 
 file(GLOB CL_SOURCES
-    icarus-proto/protocol/*.cpp
+    icarus-proto/proto/*.cpp
+    icarus-proto/proto2/*.cpp
     icarus-proto/net/*.cpp
     icarus-proto/net/win/*.cpp
     icarus-proto/net/nix/*.cpp

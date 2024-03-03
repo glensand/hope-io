@@ -12,7 +12,7 @@
 #include <string>
 #include <type_traits>
 
-namespace icarus::io {
+namespace hope::io {
 
     class stream {
     public:

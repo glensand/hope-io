@@ -13,7 +13,7 @@
 #include <functional>
 #include <string_view>
 
-namespace icarus::io {
+namespace hope::io {
 
     class acceptor {
     public:

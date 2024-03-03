@@ -10,9 +10,9 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "modernize-use-override"
 
-#include "icarus-proto/protocol/argument.h"
+#include "icarus-proto/proto/argument.h"
 
-namespace icarus::proto {
+namespace hope::proto {
 
     template<typename TValue, e_argument_type Type>
     class argument_generic : public argument {

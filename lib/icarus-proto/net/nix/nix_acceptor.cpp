@@ -29,22 +29,21 @@
 
 namespace {
 
-    class nix_acceptor final : public icarus::io::acceptor {
+    class nix_acceptor final : public hope::io::acceptor {
     public:
         nix_acceptor(std::size_t port) {
-            icarus::io::init();
             connect(port);
         }
 
     private:
-        virtual icarus::io::stream* accept() override {
+        virtual hope::io::stream* accept() override {
             int client_socket = -1;
             struct sockaddr_in client_sockaddr;
             unsigned int sin_size = sizeof(struct sockaddr);
             if((client_socket = ::accept(m_socket,(struct sockaddr *)&client_sockaddr, &sin_size)) == -1){
                 throw std::runtime_error("cannot accept connection");
             }
-            return icarus::io::create_stream((unsigned long long)client_socket);
+            return hope::io::create_stream((unsigned long long)client_socket);
         }
 
         void connect(std::size_t port) {
@@ -76,7 +75,7 @@ namespace {
 
 }
 
-namespace icarus::io {
+namespace hope::io {
 
     acceptor* create_acceptor(unsigned long long port) {
         return new nix_acceptor(port);

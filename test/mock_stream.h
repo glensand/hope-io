@@ -11,7 +11,7 @@
 #include "icarus-proto/net/stream.h"
 #include <sstream>
 
-class mock_stream final : public icarus::io::stream {
+class mock_stream final : public hope::io::stream {
 public:
     mock_stream() = default;
 

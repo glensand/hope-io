@@ -8,17 +8,17 @@
 
 #include "argument_factory.h"
 
-#include "icarus-proto/protocol/argument.h"
-#include "icarus-proto/protocol/argument_generic.h"
-#include "icarus-proto/protocol/argument_array.h"
-#include "icarus-proto/protocol/argument_struct.h"
+#include "icarus-proto/proto/argument.h"
+#include "icarus-proto/proto/argument_generic.h"
+#include "icarus-proto/proto/argument_array.h"
+#include "icarus-proto/proto/argument_struct.h"
 
 #include <unordered_map>
 #include <functional>
 
-namespace icarus::proto::argument_factory {
+namespace hope::proto::argument_factory {
 
-    argument* serialize(icarus::io::stream& stream) {
+    argument* serialize(io::stream& stream) {
         using factory_impl_t = std::unordered_map<e_argument_type, std::function<argument*(io::stream&)>>;
         static factory_impl_t factory_impl;
         if (factory_impl.empty()) {

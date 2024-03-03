@@ -8,12 +8,12 @@
 
 #pragma once
 
-#include "icarus-proto/protocol/argument.h"
-#include "icarus-proto/protocol/argument_factory.h"
+#include "icarus-proto/proto/argument.h"
+#include "icarus-proto/proto/argument_factory.h"
 
 #include <vector>
 
-namespace icarus::proto {
+namespace hope::proto {
 
     class argument_container {
     public:

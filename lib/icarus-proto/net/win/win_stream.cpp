@@ -28,10 +28,10 @@
 
 namespace {
 
-    class win_stream final : public icarus::io::stream {
+    class win_stream final : public hope::io::stream {
     public:
         explicit win_stream(unsigned long long in_socket) {
-            icarus::io::win::init();
+            hope::io::init();
 
             if (in_socket != 0)
                 socket = in_socket;
@@ -131,7 +131,7 @@ namespace {
 
 }
 
-namespace icarus::io {
+namespace hope::io {
 
     stream* create_stream(unsigned long long socket) {
         return new win_stream(socket);

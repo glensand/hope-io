@@ -15,7 +15,7 @@
 #include <winsock2.h>
 #include <stdexcept>
 
-namespace icarus::io {
+namespace hope::io {
 
     static bool initialized{ false };
 

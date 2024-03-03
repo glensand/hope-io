@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "icarus-proto/protocol/argument_struct.h"
+#include "icarus-proto/proto/argument_struct.h"
 
-namespace icarus::proto {
+namespace hope::proto {
 
     class message final {
     public:
