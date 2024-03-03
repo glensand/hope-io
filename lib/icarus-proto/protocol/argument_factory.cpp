@@ -18,7 +18,7 @@
 
 namespace icarus::proto::argument_factory {
 
-    argument* serialize(io::stream& stream) {
+    argument* serialize(icarus::io::stream& stream) {
         using factory_impl_t = std::unordered_map<e_argument_type, std::function<argument*(io::stream&)>>;
         static factory_impl_t factory_impl;
         if (factory_impl.empty()) {

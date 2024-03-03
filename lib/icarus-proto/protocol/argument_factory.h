@@ -13,6 +13,6 @@
 
 namespace icarus::proto::argument_factory {
 
-    argument *serialize(io::stream &stream);
+    icarus::proto::argument* serialize(icarus::io::stream &stream);
 
 }

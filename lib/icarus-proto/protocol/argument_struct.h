@@ -28,6 +28,18 @@ namespace icarus::proto{
             read_values(stream);
         }
 
+        template<typename T>
+        const T& field(const std::string& name) {
+            argument* arg{ nullptr };
+            for (auto* candidate : values){
+                if (candidate->get_name() == name){
+                    arg = candidate;
+                    break;
+                }
+            }
+            return arg->as<T>();
+        }
+
     private:
         argument_struct(std::string&& in_name, std::vector<argument*>&& args)
             : argument(std::move(in_name), e_argument_type::struct_value)

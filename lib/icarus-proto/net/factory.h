@@ -10,7 +10,7 @@
 
 namespace icarus::io {
 
-    class acceptor* create_acceptor(std::string_view port);
+    class acceptor* create_acceptor(unsigned long long port);
     class stream* create_stream(unsigned long long socket = 0);
 
 }

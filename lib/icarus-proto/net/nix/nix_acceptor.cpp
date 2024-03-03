@@ -78,7 +78,7 @@ namespace {
 
 namespace icarus::io {
 
-    acceptor* create_acceptor(std::size_t port) {
+    acceptor* create_acceptor(unsigned long long port) {
         return new nix_acceptor(port);
     }
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 
-project(simple-client)
+project(echo-client-server)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,6 @@ file(GLOB SAMPLE_HEADERS
 file(GLOB SAMPLE_SOURSES
     *.cpp)
 
-add_executable(simple-client ${SAMPLE_HEADERS} ${SAMPLE_SOURSES})
-target_link_libraries(icarus-proto)
-target_include_directories(simple-client PUBLIC ../lib)
+add_executable(echo-client-server ${SAMPLE_HEADERS} ${SAMPLE_SOURSES})
+target_link_libraries(echo-client-server icarus-proto)
+target_include_directories(echo-client-server PUBLIC ../lib)

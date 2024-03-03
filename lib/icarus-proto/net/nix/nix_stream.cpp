@@ -87,7 +87,7 @@ namespace {
 
 namespace icarus::io {
 
-    stream* create_stream(unsigned long long socket) {
+    stream* create_stream(unsigned long long socket){
         return new nix_stream(socket);
     }
 

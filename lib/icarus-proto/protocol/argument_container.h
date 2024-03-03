@@ -41,6 +41,7 @@ namespace icarus::proto {
                 values.emplace_back(argument_factory::serialize(stream));
             }
         }
+
     protected:
         std::vector<argument*> values;
     };

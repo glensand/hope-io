@@ -41,7 +41,7 @@ namespace icarus::proto {
         [[nodiscard]] e_argument_type get_type() const { return argument_type; }
 
         template<typename TValue>
-        const TValue& as() const { return *(TValue*)get_value_internal(); }
+        [[nodiscard]] const TValue& as() const { return *(TValue*)get_value_internal(); }
 
         virtual void write(io::stream& stream) {
             stream.write(argument_type);
