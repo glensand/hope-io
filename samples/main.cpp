@@ -6,16 +6,16 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/proto/argument.h"
-#include "icarus-proto/proto/argument_container.h"
-#include "icarus-proto/proto/argument_file.h"
-#include "icarus-proto/proto/argument_struct.h"
-#include "icarus-proto/proto/argument_array.h"
-#include "icarus-proto/proto/argument_factory.h"
-#include "icarus-proto/proto/message.h"
-#include "icarus-proto/net/stream.h"
-#include "icarus-proto/net/acceptor.h"
-#include "icarus-proto/net/factory.h"
+#include "hope-io/proto/argument.h"
+#include "hope-io/proto/argument_container.h"
+#include "hope-io/proto/argument_file.h"
+#include "hope-io/proto/argument_struct.h"
+#include "hope-io/proto/argument_array.h"
+#include "hope-io/proto/argument_factory.h"
+#include "hope-io/proto/message.h"
+#include "hope-io/net/stream.h"
+#include "hope-io/net/acceptor.h"
+#include "hope-io/net/factory.h"
 
 #include <iostream>
 

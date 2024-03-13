@@ -6,7 +6,7 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/coredefs.h"
+#include "hope-io/coredefs.h"
 
 #ifdef ICARUS_WIN
 
@@ -22,9 +22,9 @@
 
 #include <stdexcept>
 
-#include "icarus-proto/net/stream.h"
-#include "icarus-proto/net/init.h"
-#include "icarus-proto/net/factory.h"
+#include "hope-io/net/stream.h"
+#include "hope-io/net/init.h"
+#include "hope-io/net/factory.h"
 
 namespace {
 
@@ -34,7 +34,7 @@ namespace {
             hope::io::init();
 
             if (in_socket != 0)
-                socket = in_socket;
+                m_socket = in_socket;
         }
 
         virtual ~win_stream() override {
@@ -42,9 +42,13 @@ namespace {
         }
 
     private:
+        [[nodiscard]] int32_t platform_socket() const override {
+            return (int32_t)m_socket;
+        }
+
         virtual void connect(const std::string_view ip, std::size_t port) override {
             // just clear entire structures
-            if (socket != INVALID_SOCKET)
+            if (m_socket != INVALID_SOCKET)
                 throw std::runtime_error("Stream had already been connected");
 
             addrinfo* result_addr_info{ nullptr };
@@ -70,41 +74,41 @@ namespace {
                 throw std::runtime_error("TCP error: Could not resolve address");
             }
 
-            socket = INVALID_SOCKET;
+            m_socket = INVALID_SOCKET;
 
             // Attempt to connect to an address until one succeeds
             for (const auto* address_info = result_addr_info;
-                address_info != nullptr && socket == INVALID_SOCKET; address_info = address_info->ai_next) {
-                socket = ::socket(address_info->ai_family, address_info->ai_socktype, address_info->ai_protocol);
-                if (socket != INVALID_SOCKET)
+                address_info != nullptr && m_socket == INVALID_SOCKET; address_info = address_info->ai_next) {
+                m_socket = ::socket(address_info->ai_family, address_info->ai_socktype, address_info->ai_protocol);
+                if (m_socket != INVALID_SOCKET)
                 {
                     int on = 1;
-                    int error = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
+                    int error = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
                     if (error == 0) {
-                        error = ::connect(socket, address_info->ai_addr, (int)address_info->ai_addrlen);
+                        error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
                     }
 
                     if (error == SOCKET_ERROR) {
-                        closesocket(socket);
-                        socket = INVALID_SOCKET;
+                        closesocket(m_socket);
+                        m_socket = INVALID_SOCKET;
                     }
                 }
             }
 
-            if (socket == INVALID_SOCKET) {
+            if (m_socket == INVALID_SOCKET) {
                 // todo:: add addr to the exception, add log
                 throw std::runtime_error("TCP error: Could not connect socket");
             }
         }
 
         virtual void disconnect() override {
-            closesocket(socket);
-            socket = INVALID_SOCKET;
+            closesocket(m_socket);
+            m_socket = INVALID_SOCKET;
         }
 
         virtual void write(const void* data, std::size_t length) override {
             // todo a
-            const auto sent = send(socket, (const char*)data, (int)length, 0);
+            const auto sent = send(m_socket, (const char*)data, (int)length, 0);
             if (sent == SOCKET_ERROR) {
                 // TODO use WSAGetLastError
                 throw std::runtime_error("TCP error: Failed to send data");
@@ -116,7 +120,7 @@ namespace {
         virtual void read(void* data, std::size_t length) override {
             auto* buffer = (char*)data;
             while (length != 0) {
-                const auto received = recv(socket, buffer, (int)length, 0);
+                const auto received = recv(m_socket, buffer, (int)length, 0);
                 if (received < 0) {
                     // TODO use WSAGetLastError
                     throw std::runtime_error("TCP error: Failed to receive data");
@@ -126,7 +130,7 @@ namespace {
             }
         }
 
-        SOCKET socket{ INVALID_SOCKET };
+        SOCKET m_socket{ INVALID_SOCKET };
     };
 
 }

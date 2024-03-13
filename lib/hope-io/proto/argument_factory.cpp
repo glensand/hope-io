@@ -8,10 +8,10 @@
 
 #include "argument_factory.h"
 
-#include "icarus-proto/proto/argument.h"
-#include "icarus-proto/proto/argument_generic.h"
-#include "icarus-proto/proto/argument_array.h"
-#include "icarus-proto/proto/argument_struct.h"
+#include "hope-io/proto/argument.h"
+#include "hope-io/proto/argument_generic.h"
+#include "hope-io/proto/argument_array.h"
+#include "hope-io/proto/argument_struct.h"
 
 #include <unordered_map>
 #include <functional>

@@ -18,6 +18,8 @@ namespace hope::io {
     public:
         virtual ~stream() = default;
 
+        [[nodiscard]] virtual int32_t platform_socket() const = 0;
+
         virtual void connect(std::string_view ip, std::size_t port) = 0;
         virtual void disconnect() = 0;
 
@@ -46,6 +48,7 @@ namespace hope::io {
         }
     };
 
+    // TODO:: string_view
     template <>
     inline void stream::read<std::string>(std::string& val) {
         if (const auto size = read<std::size_t>(); size > 0) {

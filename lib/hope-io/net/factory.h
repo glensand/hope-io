@@ -6,20 +6,16 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-// ReSharper disable CppClangTidyCppcoreguidelinesSpecialMemberFunctions
-
 #pragma once
 
-#include <functional>
 #include <string_view>
 
 namespace hope::io {
 
-    class acceptor {
-    public:
+    class acceptor* create_acceptor(unsigned long long port);
+    class acceptor* create_tls_acceptor(unsigned long long port, std::string_view key, std::string_view cert);
 
-        virtual ~acceptor() = default;
-        virtual class stream* accept() = 0;
-    };
+    class stream* create_stream(unsigned long long socket = 0);
+    class stream* create_tls_stream(unsigned long long socket = 0);
 
 }

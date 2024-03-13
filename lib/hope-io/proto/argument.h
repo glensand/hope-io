@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <string>
 
-#include "icarus-proto/net/stream.h"
+#include "hope-io/net/stream.h"
 
 namespace hope::proto {
 

@@ -6,15 +6,15 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/coredefs.h"
+#include "hope-io/coredefs.h"
 
 #ifdef ICARUS_NIX
 
-#include "icarus-proto/net/acceptor.h"
-#include "icarus-proto/net/stream.h"
-#include "icarus-proto/net/acceptor.h"
-#include "icarus-proto/net/factory.h"
-#include "icarus-proto/net/init.h"
+#include "hope-io/net/acceptor.h"
+#include "hope-io/net/stream.h"
+#include "hope-io/net/acceptor.h"
+#include "hope-io/net/factory.h"
+#include "hope-io/net/init.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>

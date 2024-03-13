@@ -46,4 +46,4 @@ file(GLOB TEST_SOURSES
 
 add_executable(${BINARY} ${TEST_HEADERS} ${TEST_SOURSES})
 add_test(NAME ${BINARY} COMMAND ${BINARY})
-target_link_libraries(${BINARY} gtest_main icarus-proto)
+target_link_libraries(${BINARY} gtest_main hope-io)

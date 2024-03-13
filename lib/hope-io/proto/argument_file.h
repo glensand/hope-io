@@ -5,12 +5,10 @@
  * You should have received a copy of the MIT license with
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
-
 #pragma once
 
-namespace hope::io {
+#include "hope-io/proto/argument.h"
 
-    class acceptor* create_acceptor(unsigned long long port);
-    class stream* create_stream(unsigned long long socket = 0);
+namespace icarus::proto {
 
 }

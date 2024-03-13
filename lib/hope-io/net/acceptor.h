@@ -6,13 +6,17 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
+// ReSharper disable CppClangTidyCppcoreguidelinesSpecialMemberFunctions
+
 #pragma once
 
-#include "icarus-proto/proto/argument.h"
-#include "icarus-proto/net/stream.h"
+namespace hope::io {
 
-namespace hope::proto::argument_factory {
+    class acceptor {
+    public:
 
-    hope::proto::argument* serialize(hope::io::stream &stream);
+        virtual ~acceptor() = default;
+        virtual class stream* accept() = 0;
+    };
 
 }

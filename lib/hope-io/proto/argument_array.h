@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "icarus-proto/proto/argument_generic.h"
+#include "hope-io/proto/argument_generic.h"
 
 #include <vector>
 

@@ -6,22 +6,11 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/coredefs.h"
-
-#ifdef ICARUS_NIX
-
-#include "icarus-proto/net/init.h"
+#pragma once
 
 namespace hope::io {
 
-    void init() {
-
-    }
-
-    void deinit() {
-
-    }
+    void init_tls();
+    void deinit_tls();
 
 }
-
-#endif

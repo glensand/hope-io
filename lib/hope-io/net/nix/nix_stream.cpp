@@ -6,15 +6,15 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/coredefs.h"
+#include "hope-io/coredefs.h"
 
 #ifdef ICARUS_NIX
 
 #include <stdexcept>
 
-#include "icarus-proto/net/stream.h"
-#include "icarus-proto/net/init.h"
-#include "icarus-proto/net/factory.h"
+#include "hope-io/net/stream.h"
+#include "hope-io/net/init.h"
+#include "hope-io/net/factory.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +40,10 @@ namespace {
         }
 
     private:
+        [[nodiscard]] int32_t platform_socket() const override {
+            return (int32_t)m_socket;
+        }
+
         virtual void connect(const std::string_view ip, std::size_t port) override {
             struct hostent *host;
             if((host = gethostbyname(ip.data())) == nullptr){

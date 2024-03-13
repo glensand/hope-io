@@ -6,11 +6,11 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "icarus-proto/coredefs.h"
+#include "hope-io/coredefs.h"
 
 #ifdef ICARUS_WIN
 
-#include "icarus-proto/net/init.h"
+#include "hope-io/net/init.h"
 
 #include <winsock2.h>
 #include <stdexcept>

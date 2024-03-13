@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include "icarus-proto/proto/argument.h"
-#include "icarus-proto/proto/argument_factory.h"
+#include "hope-io/proto/argument.h"
+#include "hope-io/proto/argument_factory.h"
 
 #include <vector>
 

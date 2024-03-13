@@ -10,7 +10,7 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "modernize-use-override"
 
-#include "icarus-proto/proto/argument.h"
+#include "hope-io/proto/argument.h"
 
 namespace hope::proto {
 

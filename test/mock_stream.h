@@ -8,13 +8,14 @@
 
 #pragma once
 
-#include "icarus-proto/net/stream.h"
+#include "hope-io/net/stream.h"
 #include <sstream>
 
 class mock_stream final : public hope::io::stream {
 public:
     mock_stream() = default;
 
+    [[nodiscard]] virtual int32_t platform_socket() const override { return 0; }
     virtual void connect(std::string_view ip, std::size_t port) override {}
     virtual void disconnect() override {}
 

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "icarus-proto/proto/argument_struct.h"
+#include "hope-io/proto/argument_struct.h"
 
 namespace hope::proto {
 
