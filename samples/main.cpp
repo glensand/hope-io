@@ -19,6 +19,17 @@
 
 #include <iostream>
 
+static bool tls = true;
+
+auto* create_acceptor(std::size_t port) {
+    return tls ? hope::io::create_tls_acceptor(port, "key.pem", "cert.pem") 
+        : hope::io::create_acceptor(port);
+}
+
+auto* create_stream() {
+    return tls ? hope::io::create_tls_stream() : hope::io::create_stream();
+}
+
 struct message final {
     std::string name;
     std::string text;

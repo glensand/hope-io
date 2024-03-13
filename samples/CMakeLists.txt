@@ -15,4 +15,9 @@ file(GLOB SAMPLE_SOURSES
 
 add_executable(echo-client-server ${SAMPLE_HEADERS} ${SAMPLE_SOURSES})
 target_link_libraries(echo-client-server hope-io)
+
+find_package(OpenSSL REQUIRED)
 target_include_directories(echo-client-server PUBLIC ../lib)
+
+target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
+target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)
