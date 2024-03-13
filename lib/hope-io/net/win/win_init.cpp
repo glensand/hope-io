@@ -7,31 +7,34 @@
  */
 
 #include "hope-io/coredefs.h"
-
 #ifdef ICARUS_WIN
 
 #include "hope-io/net/init.h"
 
 #include <winsock2.h>
 #include <stdexcept>
+#include <mutex>
 
 namespace hope::io {
 
-    static bool initialized{ false };
-
+    static int initialized{ 0 };
+    static std::mutex guard;
+    
     void init() {
-        if (!initialized) {
+        std::lock_guard lock(guard);
+        if (initialized == 0) {
             WSADATA wsa_data;
             if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
                 throw std::runtime_error("Win error: cannot initialize WSA");
-            initialized = true;
         }
+        ++initialized;
     }
 
     void deinit() {
-        if (initialized) {
+        std::lock_guard lock(guard);
+        --initialized;
+        if (initialized == 0) {
             WSACleanup();
-            initialized = false;
         }
     }
 

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.22)
 
 project(hope-io)
 
@@ -28,9 +28,10 @@ file(GLOB CL_SOURCES
 add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})
 
 #set(OPENSSL_USE_STATIC_LIBS TRUE)
-#find_package(OpenSSL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 #add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 #target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
 
 target_include_directories(hope-io PUBLIC ../lib)
+include_directories(${OPENSSL_INCLUDE_DIR})

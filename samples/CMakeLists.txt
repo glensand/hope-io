@@ -14,5 +14,5 @@ file(GLOB SAMPLE_SOURSES
     *.cpp)
 
 add_executable(echo-client-server ${SAMPLE_HEADERS} ${SAMPLE_SOURSES})
-target_link_libraries(echo-client-server icarus-proto)
+target_link_libraries(echo-client-server hope-io)
 target_include_directories(echo-client-server PUBLIC ../lib)

@@ -39,6 +39,7 @@ namespace {
 
         virtual ~win_stream() override {
             win_stream::disconnect();
+            hope::io::deinit();
         }
 
     private:
