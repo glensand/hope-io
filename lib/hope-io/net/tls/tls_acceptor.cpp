@@ -43,13 +43,11 @@ namespace {
 
             // TODO:: proper error handling
             if (SSL_CTX_use_certificate_file(m_context, cert.data(), SSL_FILETYPE_PEM) <= 0) {
-                ERR_print_errors_fp(stderr);
-                exit(EXIT_FAILURE);
+                throw std::runtime_error("TLS acceptor: cannot create cert");
             }
 
             if (SSL_CTX_use_PrivateKey_file(m_context, key.data(), SSL_FILETYPE_PEM) <= 0 ) {
-                 ERR_print_errors_fp(stderr);
-                 exit(EXIT_FAILURE);
+                 throw std::runtime_error("TLS acceptor: cannot create key");
             }
 
             m_tcp_acceptor = hope::io::create_acceptor(port);

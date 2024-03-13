@@ -53,7 +53,7 @@ struct message final {
 };
 
 void run_client(const std::string& name) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = create_stream();
     try {
         stream->connect("localhost", 1338);
     }
@@ -71,7 +71,7 @@ void run_client(const std::string& name) {
 }
 
 void run_server() {
-    auto* acceptor = hope::io::create_acceptor(1338);
+    auto* acceptor = create_acceptor(1338);
     auto* connection = acceptor->accept();
     message msg;
     std::cout << "listen\n";
