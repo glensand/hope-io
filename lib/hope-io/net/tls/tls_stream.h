@@ -35,6 +35,10 @@ namespace hope::io {
         }
     protected:
 
+        virtual std::string get_endpoint() const override {
+            return m_tcp_stream->get_endpoint();
+        }
+
         virtual int32_t platform_socket() const override {
             return m_tcp_stream->platform_socket();
         }

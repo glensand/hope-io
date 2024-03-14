@@ -40,7 +40,17 @@ namespace {
         }
 
     private:
-        [[nodiscard]] int32_t platform_socket() const override {
+        virtual std::string get_endpoint() const override {
+            struct sockaddr_in remote_sin;
+            socklen_t remote_sinlen = sizeof(remote_sin);
+            struct sockaddr_in local_sin;
+            socklen_t local_sinlen = sizeof(local_sin);
+            getsockname(m_socket, (struct sockaddr*)&local_sin, &local_sinlen);
+
+            return "";
+        }
+
+        int32_t platform_socket() const override {
             return (int32_t)m_socket;
         }
 

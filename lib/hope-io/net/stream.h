@@ -18,6 +18,7 @@ namespace hope::io {
     public:
         virtual ~stream() = default;
 
+        [[nodiscard]] virtual std::string get_endpoint() const = 0;
         [[nodiscard]] virtual int32_t platform_socket() const = 0;
 
         virtual void connect(std::string_view ip, std::size_t port) = 0;
