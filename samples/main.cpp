@@ -22,8 +22,10 @@
 static bool tls = true;
 
 auto* create_acceptor(std::size_t port) {
-    return tls ? hope::io::create_tls_acceptor(port, "key.pem", "cert.pem") 
-        : hope::io::create_acceptor(port);
+    auto* acceptor = tls ? hope::io::create_tls_acceptor("key.pem", "cert.pem") 
+        : hope::io::create_acceptor();
+    acceptor->open(port);
+    return acceptor;
 }
 
 auto* create_stream() {

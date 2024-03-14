@@ -31,9 +31,7 @@ namespace {
 
     class nix_acceptor final : public hope::io::acceptor {
     public:
-        nix_acceptor(std::size_t port) {
-            connect(port);
-        }
+        nix_acceptor() = default;
 
     private:
         virtual hope::io::stream* accept() override {
@@ -41,15 +39,14 @@ namespace {
             struct sockaddr_in client_sockaddr;
             unsigned int sin_size = sizeof(struct sockaddr);
             if((client_socket = ::accept(m_socket,(struct sockaddr *)&client_sockaddr, &sin_size)) == -1){
-                throw std::runtime_error("cannot accept connection");
+                throw std::runtime_error("hope-io/nix_acceptor: cannot accept connection");
             }
             return hope::io::create_stream((unsigned long long)client_socket);
         }
 
-        void connect(std::size_t port) {
+        virtual void open(std::size_t port) override {
             if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1){
-                // TODO:: error
-                throw std::runtime_error("cannot create socket");
+                throw std::runtime_error("hope-io/nix_acceptor: cannot create socket");
             }
             int nodelay = 1;
 	        setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &nodelay, sizeof(nodelay));
@@ -62,8 +59,7 @@ namespace {
 	        memset(&(server_sockaddr.sin_zero),0,8);
 
 	        if((bind(m_socket,(struct sockaddr *)&server_sockaddr,sizeof(struct sockaddr))) == -1) {
-		             // TODO:: error
-                throw std::runtime_error("cannot bind socket");
+                throw std::runtime_error("hope-io/nix_acceptor: cannot bind socket");
             }
 
             auto backlog= 10; // what dows it mean
@@ -77,8 +73,8 @@ namespace {
 
 namespace hope::io {
 
-    acceptor* create_acceptor(unsigned long long port) {
-        return new nix_acceptor(port);
+    acceptor* create_acceptor() {
+        return new nix_acceptor;
     }
 
 }

@@ -50,7 +50,7 @@ namespace {
         virtual void connect(const std::string_view ip, std::size_t port) override {
             // just clear entire structures
             if (m_socket != INVALID_SOCKET)
-                throw std::runtime_error("Stream had already been connected");
+                throw std::runtime_error("hope-io/win_stream: had already been connected");
 
             addrinfo* result_addr_info{ nullptr };
             addrinfo hints_addr_info{ };
@@ -72,7 +72,7 @@ namespace {
 
             if (result != 0) {
                 // todo:: add addr to the exception, add log
-                throw std::runtime_error("TCP error: Could not resolve address");
+                throw std::runtime_error("hope-io/win_stream: could not resolve address");
             }
 
             m_socket = INVALID_SOCKET;
@@ -98,7 +98,7 @@ namespace {
 
             if (m_socket == INVALID_SOCKET) {
                 // todo:: add addr to the exception, add log
-                throw std::runtime_error("TCP error: Could not connect socket");
+                throw std::runtime_error("hope-io/win_stream: Could not connect socket");
             }
         }
 
@@ -112,7 +112,7 @@ namespace {
             const auto sent = send(m_socket, (const char*)data, (int)length, 0);
             if (sent == SOCKET_ERROR) {
                 // TODO use WSAGetLastError
-                throw std::runtime_error("TCP error: Failed to send data");
+                throw std::runtime_error("hope-io/win_stream: Failed to send data");
             }
 
             assert((std::size_t)sent == length);
@@ -124,7 +124,7 @@ namespace {
                 const auto received = recv(m_socket, buffer, (int)length, 0);
                 if (received < 0) {
                     // TODO use WSAGetLastError
-                    throw std::runtime_error("TCP error: Failed to receive data");
+                    throw std::runtime_error("hope-io/win_stream: Failed to receive data");
                 }
                 length -= received;
                 buffer += received;

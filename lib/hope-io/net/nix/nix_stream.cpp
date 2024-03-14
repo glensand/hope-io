@@ -47,11 +47,11 @@ namespace {
         virtual void connect(const std::string_view ip, std::size_t port) override {
             struct hostent *host;
             if((host = gethostbyname(ip.data())) == nullptr){
-                throw std::runtime_error("cannot resolve ip");
+                throw std::runtime_error("hope-io/nix_stream: cannot resolve ip");
 	        }
 
             if((m_socket = socket(AF_INET,SOCK_STREAM,0)) == -1){
-                throw std::runtime_error("cannot create socket");
+                throw std::runtime_error("hope-io/nix_stream: cannot create socket");
 	        }
 
             struct sockaddr_in serv_addr;
@@ -61,7 +61,7 @@ namespace {
 	        bzero(&(serv_addr.sin_zero), 8);
 
 	        if(::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1){
-                throw std::runtime_error("cannot connect to host");
+                throw std::runtime_error("hope-io/nix_stream: cannot connect to host");
 	        }
         }
 

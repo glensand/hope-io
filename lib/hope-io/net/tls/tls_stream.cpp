@@ -11,13 +11,13 @@ namespace {
             auto* context_method = TLS_client_method();
             m_context = SSL_CTX_new(context_method);
             if (m_context == nullptr) {
-                throw std::runtime_error("TLS stream: Cannot create context");
+                throw std::runtime_error("hope-io/client_tls_stream: cannot create context");
             }
             m_ssl = SSL_new(m_context);
             SSL_set_fd(m_ssl, (int32_t)m_tcp_stream->platform_socket());
 
             if (SSL_connect(m_ssl) <= 0) {
-                throw std::runtime_error("TLS stream: cannot esteblish connection");
+                throw std::runtime_error("hope-io/client_tls_stream: cannot esteblish connection");
             }
         }
 

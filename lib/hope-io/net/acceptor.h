@@ -10,12 +10,16 @@
 
 #pragma once
 
+#include <cstddef>
+
 namespace hope::io {
 
     class acceptor {
     public:
 
         virtual ~acceptor() = default;
+
+        virtual void open(std::size_t port) = 0;
         virtual class stream* accept() = 0;
     };
 

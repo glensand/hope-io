@@ -33,3 +33,6 @@ target_include_directories(hope-io PUBLIC ../lib)
 
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 include_directories(${OPENSSL_INCLUDE_DIR})
+
+target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
+target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)

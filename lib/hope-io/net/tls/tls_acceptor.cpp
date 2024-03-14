@@ -28,29 +28,17 @@ namespace {
             m_ssl = SSL_new(m_context);
             SSL_set_fd(m_ssl, m_tcp_stream->platform_socket());
             if (SSL_accept(m_ssl) <= 0) {
-                throw std::runtime_error("TLS server stream: cannot accept tls connection");
+                throw std::runtime_error("hope-io/tls_server_stream: cannot accept tls connection");
             }
         }
     };
 
     class tls_acceptor final : public hope::io::acceptor {
     public:
-        tls_acceptor(std::size_t port, std::string_view key, std::string_view cert) {
+        tls_acceptor(std::string_view key, std::string_view cert) 
+            : m_key(key.data())
+            , m_cert(cert.data()) {
             hope::io::init_tls();
-
-            auto* method = TLS_server_method();
-            m_context = SSL_CTX_new(method);
-
-            // TODO:: proper error handling
-            if (SSL_CTX_use_certificate_file(m_context, cert.data(), SSL_FILETYPE_PEM) <= 0) {
-                throw std::runtime_error("TLS acceptor: cannot create cert");
-            }
-
-            if (SSL_CTX_use_PrivateKey_file(m_context, key.data(), SSL_FILETYPE_PEM) <= 0 ) {
-                 throw std::runtime_error("TLS acceptor: cannot create key");
-            }
-
-            m_tcp_acceptor = hope::io::create_acceptor(port);
         }
 
         virtual ~tls_acceptor() override {
@@ -58,12 +46,31 @@ namespace {
         }
 
     private:
+        virtual void open(std::size_t port) override {
+            auto* method = TLS_server_method();
+            m_context = SSL_CTX_new(method);
+
+            if (SSL_CTX_use_certificate_file(m_context, m_cert.c_str(), SSL_FILETYPE_PEM) <= 0) {
+                throw std::runtime_error("hope-io/tls_acceptor: cannot create cert");
+            }
+
+            if (SSL_CTX_use_PrivateKey_file(m_context, m_key.c_str(), SSL_FILETYPE_PEM) <= 0 ) {
+                 throw std::runtime_error("hope-io/tls_acceptor: cannot create key");
+            }
+
+            m_tcp_acceptor = hope::io::create_acceptor();
+            m_tcp_acceptor->open(port);
+        }
+
         virtual hope::io::stream* accept() override {
             auto* tcp_stream = m_tcp_acceptor->accept();
             auto* tls_stream = new tls_server_stream(tcp_stream, m_context);
             tls_stream->accept_tls();
             return tls_stream;
         }
+
+        std::string m_key;
+        std::string m_cert;
 
         hope::io::acceptor* m_tcp_acceptor{ nullptr };
         SSL_CTX* m_context{ nullptr };
@@ -72,8 +79,8 @@ namespace {
 
 namespace hope::io {
 
-    acceptor* create_tls_acceptor(unsigned long long port, std::string_view key, std::string_view cert) {
-        return new tls_acceptor(port, key, cert);
+    acceptor* create_tls_acceptor(std::string_view key, std::string_view cert) {
+        return new tls_acceptor(key, cert);
     }
     
 }

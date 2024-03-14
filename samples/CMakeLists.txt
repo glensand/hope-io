@@ -19,5 +19,6 @@ target_link_libraries(echo-client-server hope-io)
 find_package(OpenSSL REQUIRED)
 target_include_directories(echo-client-server PUBLIC ../lib)
 
+set(OPENSSL_USE_STATIC_LIBS TRUE)
 target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
 target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)

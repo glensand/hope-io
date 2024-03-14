@@ -35,7 +35,6 @@ namespace {
     public:
         win_acceptor(std::string_view port) {
             hope::io::init();
-            connect(port);
         }
 
         virtual ~win_acceptor() override {
@@ -43,16 +42,20 @@ namespace {
         }
 
     private:
+
+        virtual void open(std::size_t port) override {
+            // TODO:: use to_chars
+            connect(std::to_string(port));
+        }
+
         virtual hope::io::stream* accept() override {
             if (const auto connected = ::listen(m_listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
-                // TODO:: add error
-                throw std::runtime_error("Win acceptor: Fail while listening");
+                throw std::runtime_error("hope-io/win_acceptor: listen failed");
             }
 
-            // Accept a client socket
             const auto new_socket = ::accept(m_listen_socket, nullptr, nullptr);
             if (new_socket == INVALID_SOCKET) {
-                throw std::runtime_error("Win acceptor: accept failed");
+                throw std::runtime_error("hope-io/win_acceptor: accept failed");
             }
 
             return hope::io::create_stream(new_socket);
@@ -69,23 +72,21 @@ namespace {
             hints.ai_flags = AI_PASSIVE;
 
             if (const auto got = getaddrinfo(nullptr, port.data(), &hints, &result); got != 0) {
-                // TODO:: add error
-                throw std::runtime_error("Win Acceptor: Cannot resolve address and port");
+                // TODO:: add port + address
+                throw std::runtime_error("hope-io/win_acceptor: Cannot resolve address and port");
             }
 
             m_listen_socket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
             if (m_listen_socket == INVALID_SOCKET) {
                 freeaddrinfo(result);
-                // TODO:: add error
-                throw std::runtime_error("Win acceptor: Cannot create socket");
+                throw std::runtime_error("hope-io/win_acceptor: Cannot create socket");
             }
 
-            // Setup the TCP listening socket
             if (const auto bound = bind(m_listen_socket, result->ai_addr, (int)result->ai_addrlen); bound == SOCKET_ERROR) {
                 freeaddrinfo(result);
                 closesocket(m_listen_socket);
-                // TODO:: add error
-                throw std::runtime_error("Win acceptor: Cannot bind socket");
+                // TODO:: add port
+                throw std::runtime_error("hope-io/win_acceptor: Cannot bind socket");
             }
 
             freeaddrinfo(result);
@@ -98,8 +99,8 @@ namespace {
 
 namespace hope::io {
 
-    acceptor* create_acceptor(std::size_t port) {
-        return new win_acceptor(std::to_string(port));
+    acceptor* create_acceptor() {
+        return new win_acceptor();
     }
 
 }

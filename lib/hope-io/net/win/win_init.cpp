@@ -25,7 +25,7 @@ namespace hope::io {
         if (initialized == 0) {
             WSADATA wsa_data;
             if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
-                throw std::runtime_error("Win error: cannot initialize WSA");
+                throw std::runtime_error("hope-io/win_init: cannot initialize WSA");
         }
         ++initialized;
     }

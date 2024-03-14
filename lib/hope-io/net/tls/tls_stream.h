@@ -54,10 +54,8 @@ namespace hope::io {
             do
             {
                 const auto sent = SSL_write(m_ssl, (char*)data + total, length - total);
-
-                // TODO:: 0 iz error?
-                if (sent < 0)
-                    throw std::runtime_error("TLS stream: cannot write to socket");
+                if (sent <= 0)
+                    throw std::runtime_error("hope-io/tls_stream: cannot write to socket");
                 total += sent;
             }
             while (total < length);
@@ -69,7 +67,7 @@ namespace hope::io {
             {
                 const auto received = SSL_read(m_ssl, (char*)data + total, length - total);
                 if (received <= 0)
-                    throw std::runtime_error("TLS stream: cannot read from socket");
+                    throw std::runtime_error("hope-io/tls_stream: cannot read from socket");
 
                 total += received;
             }
