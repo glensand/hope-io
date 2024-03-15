@@ -80,7 +80,8 @@ void run_server() {
     msg.recv(*connection);
     std::cout << "new msg[" << msg.name << ":" << msg.text << "]\n"; 
     msg.send(*connection);
-    std::cout << "sent";
+    std::cout << "sent\n";
+    std::cout << "ip:" << connection->get_endpoint();
 }
 
 int main(int argc, char *argv[]) {

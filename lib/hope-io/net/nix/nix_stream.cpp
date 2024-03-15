@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 namespace {
 
@@ -43,11 +44,9 @@ namespace {
         virtual std::string get_endpoint() const override {
             struct sockaddr_in remote_sin;
             socklen_t remote_sinlen = sizeof(remote_sin);
-            struct sockaddr_in local_sin;
-            socklen_t local_sinlen = sizeof(local_sin);
-            getsockname(m_socket, (struct sockaddr*)&local_sin, &local_sinlen);
-
-            return "";
+            getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen);
+            char *peeraddrpresn = inet_ntoa(remote_sin.sin_addr);
+            return peeraddrpresn;
         }
 
         int32_t platform_socket() const override {
