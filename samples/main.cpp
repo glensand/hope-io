@@ -86,6 +86,7 @@ void run_client(const std::string& name) {
 void run_server() {
     auto* acceptor = create_acceptor(1338);
     auto* connection = acceptor->accept();
+
     message msg;
     std::cout << "listen\n";
     msg.recv(*connection);

@@ -78,7 +78,7 @@ namespace udp {
 
     private:
         virtual hope::io::stream* accept() override {
-            return hope::io::create_udp_stream();
+            return hope::io::create_udp_stream(m_socket);
         }
 
         virtual void open(std::size_t port) override {

@@ -17,7 +17,7 @@ namespace hope::io {
     class acceptor* create_tls_acceptor(std::string_view key, std::string_view cert);
 
     class stream* create_tcp_stream(unsigned long long socket = 0);
-    class stream* create_udp_stream();
+    class stream* create_udp_stream(unsigned long long socket = 0);
     class stream* create_tls_stream(stream* tcp_stream = nullptr);
 
 }

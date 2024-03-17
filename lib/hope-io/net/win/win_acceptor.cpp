@@ -29,7 +29,7 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-namespace {
+namespace tcp {
 
     class win_acceptor final : public hope::io::acceptor {
     public:
@@ -58,7 +58,7 @@ namespace {
                 throw std::runtime_error("hope-io/win_acceptor: accept failed");
             }
 
-            return hope::io::create_stream(new_socket);
+            return hope::io::create_tcp_stream(new_socket);
         }
 
         void connect(std::string_view port) {
@@ -99,8 +99,8 @@ namespace {
 
 namespace hope::io {
 
-    acceptor* create_acceptor() {
-        return new win_acceptor();
+    acceptor* create_tcp_acceptor() {
+        return new tcp::win_acceptor();
     }
 
 }

@@ -26,7 +26,7 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
-namespace {
+namespace tcp {
 
     class win_stream final : public hope::io::stream {
     public:
@@ -143,8 +143,8 @@ namespace {
 
 namespace hope::io {
 
-    stream* create_stream(unsigned long long socket) {
-        return new win_stream(socket);
+    stream* create_tcp_stream(unsigned long long socket) {
+        return new tcp::win_stream(socket);
     }
 
 }
