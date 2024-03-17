@@ -22,7 +22,7 @@ namespace hope::io {
         base_tls_stream(stream* tcp_stream) 
             : m_tcp_stream(tcp_stream) {
             if (m_tcp_stream == nullptr) {
-                m_tcp_stream = hope::io::create_stream();
+                m_tcp_stream = hope::io::create_tcp_stream();
             }
             
             hope::io::init_tls();

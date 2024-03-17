@@ -17,7 +17,7 @@ namespace {
             SSL_set_fd(m_ssl, (int32_t)m_tcp_stream->platform_socket());
 
             if (SSL_connect(m_ssl) <= 0) {
-                throw std::runtime_error("hope-io/client_tls_stream: cannot esteblish connection");
+                throw std::runtime_error("hope-io/client_tls_stream: cannot establish connection");
             }
         }
 

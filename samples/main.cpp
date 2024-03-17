@@ -19,17 +19,28 @@
 
 #include <iostream>
 
-static bool tls = true;
+static bool tcp = false; // will use UDP protocol if set to false
+static bool tls = tcp;
 
 auto* create_acceptor(std::size_t port) {
-    auto* acceptor = tls ? hope::io::create_tls_acceptor("key.pem", "cert.pem") 
-        : hope::io::create_acceptor();
+    hope::io::acceptor* acceptor;
+    if (tcp) {
+        acceptor = tls ?
+                hope::io::create_tls_acceptor("key.pem", "cert.pem")
+                : hope::io::create_tcp_acceptor();
+    }
+    else {
+        acceptor = hope::io::create_udp_acceptor();
+    }
     acceptor->open(port);
     return acceptor;
 }
 
 auto* create_stream() {
-    return tls ? hope::io::create_tls_stream() : hope::io::create_stream();
+    if (tcp) {
+        return tls ? hope::io::create_tls_stream() : hope::io::create_tcp_stream();
+    }
+    return hope::io::create_udp_stream();
 }
 
 struct message final {

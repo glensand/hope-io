@@ -16,18 +16,18 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <unistd.h>
 #include <fcntl.h>
-#include <string.h>
+#include <cstring>
 #include <netdb.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-namespace {
+namespace tcp {
 
     class nix_stream final : public hope::io::stream {
     public:
@@ -42,35 +42,35 @@ namespace {
 
     private:
         virtual std::string get_endpoint() const override {
-            struct sockaddr_in remote_sin;
+            struct sockaddr_in remote_sin{};
             socklen_t remote_sinlen = sizeof(remote_sin);
             getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen);
             char *peeraddrpresn = inet_ntoa(remote_sin.sin_addr);
             return peeraddrpresn;
         }
 
-        int32_t platform_socket() const override {
+        [[nodiscard]] int32_t platform_socket() const override {
             return (int32_t)m_socket;
         }
 
         virtual void connect(const std::string_view ip, std::size_t port) override {
             struct hostent *host;
-            if((host = gethostbyname(ip.data())) == nullptr){
-                throw std::runtime_error("hope-io/nix_stream: cannot resolve ip");
+            if ((host = gethostbyname(ip.data())) == nullptr) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot resolve ip");
 	        }
 
-            if((m_socket = socket(AF_INET,SOCK_STREAM,0)) == -1){
-                throw std::runtime_error("hope-io/nix_stream: cannot create socket");
+            if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot create socket");
 	        }
 
-            struct sockaddr_in serv_addr;
+            struct sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
 	        serv_addr.sin_port = htons(port);
 	        serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
 	        bzero(&(serv_addr.sin_zero), 8);
 
-	        if(::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1){
-                throw std::runtime_error("hope-io/nix_stream: cannot connect to host");
+	        if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot connect to host");
 	        }
         }
 
@@ -81,27 +81,106 @@ namespace {
 
         virtual void write(const void* data, std::size_t length) override {
             auto bytes_sent = 0;
-            while (bytes_sent != length){
+            while (bytes_sent != length) {
                 bytes_sent += send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
             }
         }
 
         virtual void read(void* data, std::size_t length) override {
-            auto recvbytes = 0;
-            while (recvbytes != length) {
-                recvbytes += recv(m_socket, (char*)data + recvbytes, length - recvbytes, 0);
+            auto recv_bytes = 0;
+            while (recv_bytes != length) {
+                recv_bytes += recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
             }
         }
 
-        std::size_t m_socket{ 0 };
+        int m_socket{ 0 };
+    };
+
+}
+
+namespace udp {
+
+    class nix_stream final : public hope::io::stream {
+    public:
+        nix_stream() = default;
+
+        virtual ~nix_stream() override {
+            disconnect();
+        }
+
+    private:
+        virtual std::string get_endpoint() const override {
+            struct sockaddr_in remote_sin{};
+            socklen_t remote_sinlen = sizeof(remote_sin);
+            getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen);
+            char *peeraddrpresn = inet_ntoa(remote_sin.sin_addr);
+            return peeraddrpresn;
+        }
+
+        [[nodiscard]] int32_t platform_socket() const override {
+            return (int32_t)m_socket;
+        }
+
+        virtual void connect(const std::string_view ip, std::size_t port) override {
+            struct hostent *host;
+            if ((host = gethostbyname(ip.data())) == nullptr) {
+                throw std::runtime_error("hope-io/nix_stream [udp]: cannot resolve ip");
+            }
+
+            if ((m_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                throw std::runtime_error("hope-io/nix_stream [udp]: cannot create socket");
+            }
+
+            struct timeval tv{};
+            tv.tv_sec = 10;
+            tv.tv_usec = 0;
+            setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_port = htons(port);
+            serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
+            bzero(&(serv_addr.sin_zero), 8);
+        }
+
+        virtual void disconnect() override {
+            close(m_socket);
+            m_socket = 0;
+        }
+
+        virtual void write(const void* data, std::size_t length) override {
+            auto bytes_sent = 0;
+            //while (bytes_sent != length)
+            {
+                bytes_sent += sendto(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0,
+                                     (const struct sockaddr *)&serv_addr, sizeof(serv_addr));
+            }
+        }
+
+        virtual void read(void* data, std::size_t length) override {
+            auto recv_bytes = 0;
+            socklen_t len;
+            //while (recv_bytes != length)
+            {
+                recv_bytes += recvfrom(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0,
+                                       (struct sockaddr *)&serv_addr, &len);
+            }
+        }
+
+        int m_socket{ 0 };
+
+        struct sockaddr_in serv_addr{};
     };
 
 }
 
 namespace hope::io {
 
-    stream* create_stream(unsigned long long socket){
-        return new nix_stream(socket);
+    stream* create_tcp_stream(unsigned long long socket) {
+        return new tcp::nix_stream(socket);
+    }
+
+    stream* create_udp_stream() {
+        return new udp::nix_stream();
     }
 
 }
