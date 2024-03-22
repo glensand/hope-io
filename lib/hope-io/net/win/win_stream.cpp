@@ -43,6 +43,11 @@ namespace {
         }
 
     private:
+        virtual std::string get_endpoint() const override {
+            assert(false && "not implemented");
+            return "";
+        }
+
         [[nodiscard]] int32_t platform_socket() const override {
             return (int32_t)m_socket;
         }

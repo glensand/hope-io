@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 namespace {
 
@@ -40,7 +41,15 @@ namespace {
         }
 
     private:
-        [[nodiscard]] int32_t platform_socket() const override {
+        virtual std::string get_endpoint() const override {
+            struct sockaddr_in remote_sin;
+            socklen_t remote_sinlen = sizeof(remote_sin);
+            getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen);
+            char *peeraddrpresn = inet_ntoa(remote_sin.sin_addr);
+            return peeraddrpresn;
+        }
+
+        int32_t platform_socket() const override {
             return (int32_t)m_socket;
         }
 
