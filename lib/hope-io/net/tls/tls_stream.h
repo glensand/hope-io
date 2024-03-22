@@ -12,6 +12,8 @@
 #include "hope-io/net/factory.h"
 #include "hope-io/net/tls/tls_init.h"
 
+#ifdef HOPE_IO_USE_OPENSSL
+
 #include "openssl/ssl.h"
 #include "openssl/err.h"
 
@@ -19,7 +21,7 @@ namespace hope::io {
 
     class base_tls_stream : public stream {
     public:
-        base_tls_stream(stream* tcp_stream) 
+        explicit base_tls_stream(stream* tcp_stream)
             : m_tcp_stream(tcp_stream) {
             if (m_tcp_stream == nullptr) {
                 m_tcp_stream = hope::io::create_stream();
@@ -82,3 +84,4 @@ namespace hope::io {
 
 }
 
+#endif

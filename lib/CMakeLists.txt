@@ -27,12 +27,20 @@ file(GLOB CL_SOURCES
 
 add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})
 
-find_package(OpenSSL REQUIRED)
+find_package(OpenSSL)
+
+if (OPENSSL_FOUND)
+    message("Hope-io/ Found openssl, tls features are available")
+
+    add_definitions(-DHOPE_IO_USE_OPENSSL)
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+    include_directories(${OPENSSL_INCLUDE_DIR})
+
+    target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
+    target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)
+else ()
+    message("Hope-io/ OPenSSl not found, tls features is not available")
+endif ()
 
 target_include_directories(hope-io PUBLIC ../lib)
 
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-include_directories(${OPENSSL_INCLUDE_DIR})
-
-target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
-target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)
