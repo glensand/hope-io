@@ -58,7 +58,7 @@ namespace {
                  throw std::runtime_error("hope-io/tls_acceptor: cannot create key");
             }
 
-            m_tcp_acceptor = hope::io::create_tcp_acceptor();
+            m_tcp_acceptor = hope::io::create_acceptor();
             m_tcp_acceptor->open(port);
         }
 
