@@ -29,7 +29,7 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-namespace tcp {
+namespace {
 
     class win_acceptor final : public hope::io::acceptor {
     public:
@@ -99,8 +99,8 @@ namespace tcp {
 
 namespace hope::io {
 
-    acceptor* create_tcp_acceptor() {
-        return new tcp::win_acceptor();
+    acceptor* create_acceptor() {
+        return new win_acceptor();
     }
 
 }
