@@ -58,7 +58,7 @@ namespace {
                 throw std::runtime_error("hope-io/win_acceptor: accept failed");
             }
 
-            return hope::io::create_stream(new_socket);
+            return hope::io::create_tcp_stream(new_socket);
         }
 
         void connect(std::string_view port) {

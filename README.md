@@ -1,2 +1,2 @@
-# daedalus-proto-lib
-small all in one lib for tcp communication
+# hope-io-lib
+Small all in one lib for TCP/UDP communication with TLS

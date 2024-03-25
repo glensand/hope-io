@@ -10,33 +10,28 @@
 
 #ifdef ICARUS_NIX
 
-#include <stdexcept>
-
 #include "hope-io/net/stream.h"
-#include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
-#include <cstdio>
 #include <cstdlib>
-#include <unistd.h>
-#include <fcntl.h>
 #include <cstring>
+#include <stdexcept>
+#include <unistd.h>
 #include <netdb.h>
-#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
 namespace {
 
-    class nix_stream final : public hope::io::stream {
+    class nix_sender final : public hope::io::stream {
     public:
-        explicit nix_stream(unsigned long long in_socket) {
+        explicit nix_sender(unsigned long long in_socket) {
             if (in_socket != 0)
                 m_socket = in_socket;
         }
 
-        virtual ~nix_stream() override {
+        virtual ~nix_sender() override {
             disconnect();
         }
 
@@ -56,25 +51,19 @@ namespace {
         virtual void connect(const std::string_view ip, std::size_t port) override {
             struct hostent *host;
             if ((host = gethostbyname(ip.data())) == nullptr) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot resolve ip: " +
+                throw std::runtime_error("hope-io/nix_sender: cannot resolve ip: " +
                                          std::string(strerror(errno)));
-	        }
+            }
 
-            if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot create socket: " +
+            if (!m_socket && (m_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+                throw std::runtime_error("hope-io/nix_sender: cannot create socket: " +
                                          std::string(strerror(errno)));
-	        }
+            }
 
-            struct sockaddr_in serv_addr{};
             serv_addr.sin_family = AF_INET;
-	        serv_addr.sin_port = htons(port);
-	        serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
-	        bzero(&(serv_addr.sin_zero), 8);
-
-	        if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot connect to host: " +
-                                         std::string(strerror(errno)));
-	        }
+            serv_addr.sin_port = htons(port);
+            serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
+            bzero(&(serv_addr.sin_zero), 8);
         }
 
         virtual void disconnect() override {
@@ -83,28 +72,29 @@ namespace {
         }
 
         virtual void write(const void* data, std::size_t length) override {
-            auto bytes_sent = 0;
-            while (bytes_sent != length) {
-                bytes_sent += send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
+            auto bytes_sent = sendto(m_socket, (char*)data, length, 0,
+                                     (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+            if (bytes_sent == -1) {
+                throw std::runtime_error("hope-io/nix_sender: failed to write data: " +
+                                         std::string(strerror(errno)));
             }
         }
 
         virtual void read(void* data, std::size_t length) override {
-            auto recv_bytes = 0;
-            while (recv_bytes != length) {
-                recv_bytes += recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
-            }
+            assert(false);
         }
 
         int m_socket{ 0 };
+
+        struct sockaddr_in serv_addr{};
     };
 
 }
 
 namespace hope::io {
 
-    stream* create_stream(unsigned long long socket) {
-        return new nix_stream(socket);
+    stream* create_sender(unsigned long long socket) {
+        return new nix_sender(socket);
     }
 
 }

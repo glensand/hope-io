@@ -37,5 +37,5 @@ build/
 *.DS_Store
 .vscode/
 .vs/
-
+.idea/
 
