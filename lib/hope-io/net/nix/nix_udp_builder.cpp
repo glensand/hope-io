@@ -13,6 +13,8 @@
 #include "hope-io/net/udp_builder.h"
 #include "hope-io/net/factory.h"
 
+#include <exception>
+#include <stdexcept>
 #include <cstdlib>
 #include <cstring>
 #include <sys/socket.h>
