@@ -26,14 +26,11 @@ namespace hope::io {
             if (m_tcp_stream == nullptr) {
                 m_tcp_stream = hope::io::create_stream();
             }
-            
-            hope::io::init_tls();
         }
 
         virtual ~base_tls_stream() override {
             base_tls_stream::disconnect();
             delete m_tcp_stream;
-            hope::io::deinit_tls();
         }
     protected:
 

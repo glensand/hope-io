@@ -31,15 +31,11 @@ namespace {
     class win_stream final : public hope::io::stream {
     public:
         explicit win_stream(unsigned long long in_socket) {
-            hope::io::init();
-
-            if (in_socket != 0)
-                m_socket = in_socket;
+            m_socket = in_socket;
         }
 
         virtual ~win_stream() override {
             win_stream::disconnect();
-            hope::io::deinit();
         }
 
     private:

@@ -13,16 +13,11 @@
 #include <stdexcept>
 
 #include "hope-io/net/stream.h"
-#include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
-#include <cstdio>
-#include <cstdlib>
 #include <unistd.h>
-#include <fcntl.h>
 #include <cstring>
 #include <netdb.h>
-#include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -32,8 +27,7 @@ namespace {
     class nix_stream final : public hope::io::stream {
     public:
         explicit nix_stream(unsigned long long in_socket) {
-            if (in_socket != 0)
-                m_socket = in_socket;
+            m_socket = in_socket;
         }
 
         virtual ~nix_stream() override {
@@ -54,7 +48,7 @@ namespace {
         }
 
         virtual void connect(const std::string_view ip, std::size_t port) override {
-            struct hostent *host;
+            struct hostent* host;
             if ((host = gethostbyname(ip.data())) == nullptr) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot resolve ip: " +
                                          std::string(strerror(errno)));
