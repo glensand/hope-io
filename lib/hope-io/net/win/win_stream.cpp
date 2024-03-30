@@ -132,6 +132,10 @@ namespace {
             }
         }
 
+        virtual void stream_in(std::string& buffer) override {
+            assert(false & "Not implemented");
+        }
+
         SOCKET m_socket{ INVALID_SOCKET };
     };
 

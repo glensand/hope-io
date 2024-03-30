@@ -27,6 +27,8 @@ namespace hope::io {
         virtual void write(const void *data, std::size_t length) = 0;
         virtual void read(void *data, std::size_t length) = 0;
 
+        virtual void stream_in(std::string& buffer) = 0;
+
         template<typename TValue>
         void write(const TValue &val) {
             static_assert(std::is_trivial_v<std::decay_t<TValue>>,

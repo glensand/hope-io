@@ -15,6 +15,7 @@
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"
 
+#include <cassert>
 #include <unistd.h>
 #include <cstring>
 #include <netdb.h>
@@ -88,6 +89,10 @@ namespace {
             while (recv_bytes != length) {
                 recv_bytes += recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
             }
+        }
+
+        virtual void stream_in(std::string& buffer) override {
+            assert(false && "Not implemented");
         }
 
         int m_socket{ 0 };

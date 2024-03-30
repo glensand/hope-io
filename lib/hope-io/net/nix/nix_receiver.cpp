@@ -24,6 +24,7 @@
 
 namespace {
 
+    // TODO:: remove inheritance
     class nix_receiver final : public hope::io::stream {
     public:
         explicit nix_receiver(unsigned long long in_socket) {
@@ -83,6 +84,10 @@ namespace {
                 throw std::runtime_error("hope-io/nix_receiver: failed to read data: " +
                                          std::string(strerror(errno)));
             }
+        }
+
+        virtual void stream_in(std::string& buffer) override {
+            assert(false && "Not implemented");
         }
 
         int m_socket{ 0 };

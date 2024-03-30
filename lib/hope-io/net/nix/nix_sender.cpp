@@ -24,6 +24,7 @@
 
 namespace {
 
+    // TODO:: remove inheritans 
     class nix_sender final : public hope::io::stream {
     public:
         explicit nix_sender(unsigned long long in_socket) {
@@ -84,6 +85,10 @@ namespace {
             assert(false);
         }
 
+        virtual void stream_in(std::string& buffer) override {
+            assert(false && "Not implemented");
+        }
+        
         int m_socket{ 0 };
 
         struct sockaddr_in serv_addr{};

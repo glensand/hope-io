@@ -54,6 +54,7 @@ namespace hope::io {
 
         virtual void write(const void *data, std::size_t length) override {
             std::size_t total = 0;
+            // TODO:: do we need cycle here?
             do
             {
                 const auto sent = SSL_write(m_ssl, (char*)data + total, length - total);
@@ -66,6 +67,7 @@ namespace hope::io {
 
         virtual void read(void *data, std::size_t length) override {
             std::size_t total = 0;
+            // TODO:: do we need cycle here?
             do
             {
                 const auto received = SSL_read(m_ssl, (char*)data + total, length - total);
@@ -75,6 +77,15 @@ namespace hope::io {
                 total += received;
             }
             while (total < length);
+        }
+
+        virtual void stream_in(std::string& out_stream) override {
+            constexpr static std::size_t BufferSize{ 1024 };
+            char buffer[BufferSize];
+            int bytes_read = 0;
+            while ((bytes_read = SSL_read(m_ssl, buffer, BufferSize)) > 0) {
+                out_stream.append(buffer, bytes_read);
+            }
         }
 
         stream* m_tcp_stream{ nullptr };
