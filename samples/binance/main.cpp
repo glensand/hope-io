@@ -8,7 +8,7 @@ int main() {
     hope::io::init_tls();
     auto* stream = hope::io::create_tls_stream();
     try {
-        stream->connect("108.156.104.11", 443);
+        stream->connect("api.binance.com", 443);
 
         const char* request = "GET /api/v3/ticker/price?symbol=BTCUSDT HTTP/1.1\r\nHost: api.binance.com\r\nConnection: close\r\n\r\n";
         stream->write(request, strlen(request));
