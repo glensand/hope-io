@@ -19,7 +19,7 @@ public:
     virtual int32_t platform_socket() const override { return 0; }
     virtual void connect(std::string_view ip, std::size_t port) override {}
     virtual void disconnect() override {}
-
+    virtual void stream_in(std::string& buffer) override {}
     virtual void write(const void* data, std::size_t length) override {
         stream_impl.write((const char*)data, length);
     }
