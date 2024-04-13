@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <cstring>
 
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
