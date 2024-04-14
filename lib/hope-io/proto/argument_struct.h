@@ -6,8 +6,6 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 #pragma once
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "modernize-use-override"
 
 #include "hope-io/proto/argument_container.h"
 
@@ -79,4 +77,3 @@ namespace hope::proto{
     };
 
 }
-#pragma clang diagnostic pop
