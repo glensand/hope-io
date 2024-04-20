@@ -17,6 +17,8 @@
 #include "openssl/ssl.h"
 #include "openssl/err.h"
 
+#include <stdexcept>
+
 namespace hope::io {
 
     class base_tls_stream : public stream {
