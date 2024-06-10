@@ -51,13 +51,17 @@ namespace {
         virtual void stream_in(std::string& out_stream) override {
             assert(accept_handshake && "Need to accept a handshake to read packages");
 
+            if (no_more_data) {
+	            return;
+            }
+
             auto&& frame = hope::io::websockets::read_frame([&](void* buffer, std::size_t length) {
 	            return SSL_read(m_ssl, buffer, length);
             });
 
-
             // TODO: Critical (Process others frames (eof, long messages, ping/pong))
             if (!frame.complete_stream() || frame.header.op_code != hope::io::websockets::OPCODE_TEXT) {
+                no_more_data = true;
 	            return;
             }
 
@@ -82,6 +86,7 @@ namespace {
     private:
         std::string host;
         bool accept_handshake = false;
+        bool no_more_data = false;
     };
 
 }
