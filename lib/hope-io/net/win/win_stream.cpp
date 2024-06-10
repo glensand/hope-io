@@ -26,6 +26,10 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
+ // For internal use, since windows one is not acceptable
+#undef INVALID_SOCKET
+#define INVALID_SOCKET 0
+
 namespace {
 
     class win_stream final : public hope::io::stream {
