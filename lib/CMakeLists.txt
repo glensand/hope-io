@@ -17,6 +17,7 @@ file(GLOB CL_HEADERS
     hope-io/net/win/*.h
     hope-io/net/nix/*.h
     hope-io/net/tls/*.h
+    hope-io/net/websockets/*.h
 )
 
 file(GLOB CL_SOURCES
@@ -26,6 +27,7 @@ file(GLOB CL_SOURCES
     hope-io/net/win/*.cpp
     hope-io/net/nix/*.cpp
     hope-io/net/tls/*.cpp
+    hope-io/net/websockets/*.cpp
 )
 
 add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})
