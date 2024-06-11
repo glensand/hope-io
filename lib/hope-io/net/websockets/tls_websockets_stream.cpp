@@ -55,9 +55,7 @@ namespace {
 	            return;
             }
 
-            auto&& frame = hope::io::websockets::read_frame([&](void* buffer, std::size_t length) {
-	            return SSL_read(m_ssl, buffer, length);
-            });
+            auto&& frame = hope::io::websockets::read_frame(this);
 
             // TODO: Critical (Process others frames (eof, long messages, ping/pong))
             if (!frame.complete_stream() || frame.header.op_code != hope::io::websockets::OPCODE_TEXT) {

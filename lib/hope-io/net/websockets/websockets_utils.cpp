@@ -2,6 +2,7 @@
 #include <format>
 
 #include "websockets.h"
+#include "hope-io/net/stream.h"
 
 #include <random>
 #include <unordered_map>
@@ -136,9 +137,10 @@ namespace hope::io::websockets {
         return true;
 	}
 
-    websocket_frame read_frame(read_stream_func&& read_function) {
+    websocket_frame read_frame(stream* stream) {
+		assert(stream && "stream must be valid");
         websocket_frame frame;
-        if (read_function(&frame.header, websocket_frame::header_size) == websocket_frame::header_size) {
+        if (stream->read(&frame.header, websocket_frame::header_size) == websocket_frame::header_size) {
             static auto&& read_package_length = [&](size_t& out_package_length) {
                 std::uint8_t extra_length_bytes = 0;
                 const auto package_length = frame.header.package_length;
@@ -153,7 +155,7 @@ namespace hope::io::websockets {
 
                 if (extra_length_bytes > 0) {
                     std::vector<std::uint8_t> data_length_buffer(extra_length_bytes);
-                    if (read_function(data_length_buffer.data(), data_length_buffer.size()) != data_length_buffer.size()) {
+                    if (stream->read(data_length_buffer.data(), data_length_buffer.size()) != data_length_buffer.size()) {
                         return false;
                     }
 
@@ -167,7 +169,7 @@ namespace hope::io::websockets {
                 }
 
                 return true;
-            };
+                };
 
             size_t package_length;
             if (read_package_length(package_length)) {
@@ -176,6 +178,6 @@ namespace hope::io::websockets {
         }
 
         return frame;
-	}
+    }
 
 }

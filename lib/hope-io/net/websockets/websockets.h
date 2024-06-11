@@ -1,8 +1,13 @@
 #pragma once
 
 #include <array>
-#include <functional>
+#include <cstdint>
 #include <string>
+
+namespace hope::io
+{
+	class stream;
+}
 
 namespace hope::io::websockets {
 
@@ -18,6 +23,7 @@ namespace hope::io::websockets {
 	constexpr auto OPCODE_PING = 0x9;
 	constexpr auto OPCODE_PONG = 0xA;
 
+#pragma pack(push, 2)
 	struct websocket_frame
 	{
 		struct header
@@ -30,8 +36,7 @@ namespace hope::io::websockets {
 		};
 
 		static constexpr auto header_size = sizeof(websocket_frame::header);
-
-		static_assert(sizeof(header) == 0x2, "websocket_frame::header must be 0x2 bytes");
+		static_assert(header_size == 0x2, "websocket_frame::header must be 0x2 bytes");
 
 		bool control() const { return header.is_eof && (header.op_code == OPCODE_CLOSE || header.op_code == OPCODE_PING || header.op_code == OPCODE_PONG); }
 		bool empty() const { return header.is_eof == 0x0 && header.op_code == OPCODE_EMPTY && length == 0; }
@@ -43,12 +48,11 @@ namespace hope::io::websockets {
 		bool complete_stream() const { return header.is_eof && header.op_code != OPCODE_EMPTY; }
 
 		header header{};
-
 		std::array<std::uint8_t, 4> mask;
 		std::size_t length{};
 	};
+#pragma pack(pop)
 
-	using read_stream_func = std::function<size_t(void*, std::size_t)>;
-	websocket_frame read_frame(read_stream_func&& read_function);
+	websocket_frame read_frame(stream* stream);
 
 }
