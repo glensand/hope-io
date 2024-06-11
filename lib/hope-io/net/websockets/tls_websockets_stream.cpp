@@ -19,13 +19,13 @@ namespace {
             auto* context_method = TLS_client_method();
             m_context = SSL_CTX_new(context_method);
             if (m_context == nullptr) {
-                throw std::runtime_error("hope-io/client_tls_stream: cannot create context");
+                throw std::runtime_error("hope-io/client_tls_websockets_stream: cannot create context");
             }
             m_ssl = SSL_new(m_context);
             SSL_set_fd(m_ssl, (int32_t)m_tcp_stream->platform_socket());
 
             if (SSL_connect(m_ssl) <= 0) {
-                throw std::runtime_error("hope-io/client_tls_stream: cannot establish connection");
+                throw std::runtime_error("hope-io/client_tls_websockets_stream: cannot establish connection");
             }
 
             host = ip;
@@ -70,7 +70,7 @@ namespace {
             std::array<char, 1024> read_buffer;
             while (package_length > 0) {
                 const size_t read_chunk = std::min<size_t>(package_length, read_buffer.size());
-                const size_t read_bytes = base_tls_stream::/**/read_bytes(read_buffer.data(), read_chunk);
+                const size_t read_bytes = base_tls_stream::read_bytes(read_buffer.data(), read_chunk);
 
                 out_stream.append(read_buffer.data(), read_bytes);
 
