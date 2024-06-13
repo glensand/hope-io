@@ -65,12 +65,18 @@ namespace {
 
             size_t package_length = frame.length;
 
-            std::array<char, 1024> read_buffer;
+            std::array<uint8_t, 1024> read_buffer;
             while (package_length > 0) {
                 const size_t read_chunk = std::min<size_t>(package_length, read_buffer.size());
                 const size_t read_bytes = base_tls_stream::read_bytes(read_buffer.data(), read_chunk);
 
-                out_stream.append(read_buffer.data(), read_bytes);
+                if (frame.masked()) {
+	                for (size_t i = 0; i < read_bytes; ++i) {
+                        read_buffer[i] = read_buffer[i] ^ frame.mask[i % frame.mask.size()];
+	                }
+                }
+
+                out_stream.append(reinterpret_cast<char*>(read_buffer.data()), read_bytes);
 
                 package_length = package_length < read_bytes ? 0 : package_length - read_bytes;
             }
@@ -79,6 +85,7 @@ namespace {
         virtual void disconnect() override {
             base_tls_stream::disconnect();
             SSL_CTX_free(m_context);
+            accept_handshake = false;
         }
 
     private:
