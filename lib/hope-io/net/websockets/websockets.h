@@ -36,16 +36,18 @@ namespace hope::io::websockets {
 		};
 
 		static constexpr auto header_size = sizeof(websocket_frame::header);
-		static_assert(header_size == 0x2, "websocket_frame::header must be 0x2 bytes");
+		static_assert(header_size == 0x2u, "websocket_frame::header must be 0x2 bytes");
 
 		bool control() const { return header.is_eof && (header.op_code == OPCODE_CLOSE || header.op_code == OPCODE_PING || header.op_code == OPCODE_PONG); }
-		bool empty() const { return header.is_eof == 0x0 && header.op_code == OPCODE_EMPTY && length == 0; }
+		bool empty() const { return header.is_eof == 0x0u && header.op_code == OPCODE_EMPTY && length == 0; }
 
-		bool begin_stream() const { return header.is_eof == 0x0 && header.op_code != OPCODE_EMPTY; }
-		bool continue_stream() const { return header.is_eof == 0x0 && header.op_code == OPCODE_EMPTY; }
+		bool begin_stream() const { return header.is_eof == 0x0u && header.op_code != OPCODE_EMPTY; }
+		bool continue_stream() const { return header.is_eof == 0x0u && header.op_code == OPCODE_EMPTY; }
 		bool end_stream() const { return header.is_eof && header.op_code == OPCODE_EMPTY; }
 
 		bool complete_stream() const { return header.is_eof && header.op_code != OPCODE_EMPTY; }
+
+		bool masked() const { return header.mask != 0x0u; }
 
 		header header{};
 		std::array<std::uint8_t, 4> mask;

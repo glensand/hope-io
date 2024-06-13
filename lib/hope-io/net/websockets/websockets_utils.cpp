@@ -175,6 +175,10 @@ namespace hope::io::websockets {
             if (read_package_length(package_length)) {
                 frame.length = package_length;
             }
+
+            if (frame.masked()) {
+                stream->read(frame.mask.data(), frame.mask.size());
+            }
         }
 
         return frame;
