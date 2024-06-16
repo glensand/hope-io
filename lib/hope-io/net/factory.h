@@ -20,5 +20,5 @@ namespace hope::io {
     class stream* create_receiver(unsigned long long socket = 0);
     class stream* create_sender(unsigned long long socket = 0);
     class stream* create_tls_stream(stream* tcp_stream = nullptr);
-
+    class stream* create_tls_websockets_stream(stream* tcp_stream = nullptr);
 }

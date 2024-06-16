@@ -81,8 +81,9 @@ namespace {
             }
         }
 
-        virtual void read(void* data, std::size_t length) override {
+        virtual size_t read(void* data, std::size_t length) override {
             assert(false);
+            return 0;
         }
 
         virtual void stream_in(std::string& buffer) override {

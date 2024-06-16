@@ -25,7 +25,7 @@ namespace hope::io {
         virtual void disconnect() = 0;
 
         virtual void write(const void *data, std::size_t length) = 0;
-        virtual void read(void *data, std::size_t length) = 0;
+        virtual size_t read(void *data, std::size_t length) = 0;
 
         virtual void stream_in(std::string& buffer) = 0;
 

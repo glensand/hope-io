@@ -76,7 +76,7 @@ namespace {
             assert(false);
         }
 
-        virtual void read(void* data, std::size_t length) override {
+        virtual size_t read(void* data, std::size_t length) override {
             socklen_t len;
             auto recv_bytes = recvfrom(m_socket, (char*)data, length, 0,
                                        (struct sockaddr *)&serv_addr, &len);
@@ -84,6 +84,8 @@ namespace {
                 throw std::runtime_error("hope-io/nix_receiver: failed to read data: " +
                                          std::string(strerror(errno)));
             }
+
+            return recv_bytes;
         }
 
         virtual void stream_in(std::string& buffer) override {

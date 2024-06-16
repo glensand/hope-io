@@ -26,6 +26,10 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/factory.h"
 
+ // For internal use, since windows one is not acceptable
+#undef INVALID_SOCKET
+#define INVALID_SOCKET 0
+
 namespace {
 
     class win_stream final : public hope::io::stream {
@@ -116,13 +120,13 @@ namespace {
                 throw std::runtime_error("hope-io/win_stream: Failed to send data");
             }
 
-            assert((std::size_t)sent == length);
+            assert(static_cast<std::size_t>(sent) == length);
         }
 
-        virtual void read(void* data, std::size_t length) override {
+        virtual size_t read(void* data, std::size_t length) override {
             auto* buffer = (char*)data;
             while (length != 0) {
-                const auto received = recv(m_socket, buffer, (int)length, 0);
+                const auto received = recv(m_socket, buffer, static_cast<int>(length), 0);
                 if (received < 0) {
                     // TODO use WSAGetLastError
                     throw std::runtime_error("hope-io/win_stream: Failed to receive data");
@@ -130,6 +134,7 @@ namespace {
                 length -= received;
                 buffer += received;
             }
+            return length;
         }
 
         virtual void stream_in(std::string& buffer) override {

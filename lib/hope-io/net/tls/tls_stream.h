@@ -67,7 +67,7 @@ namespace hope::io {
             while (total < length);
         }
 
-        virtual void read(void *data, std::size_t length) override {
+        virtual size_t read(void *data, std::size_t length) override {
             std::size_t total = 0;
             // TODO:: do we need cycle here?
             do
@@ -79,6 +79,8 @@ namespace hope::io {
                 total += received;
             }
             while (total < length);
+
+            return total;
         }
 
         virtual void stream_in(std::string& out_stream) override {
@@ -89,6 +91,10 @@ namespace hope::io {
                 out_stream.append(buffer, bytes_read);
             }
         }
+
+		size_t read_bytes(void* data, std::size_t length) const {
+           return SSL_read(m_ssl, data, length);
+		}
 
         stream* m_tcp_stream{ nullptr };
 

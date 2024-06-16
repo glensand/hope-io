@@ -84,11 +84,12 @@ namespace {
             }
         }
 
-        virtual void read(void* data, std::size_t length) override {
+        virtual size_t read(void* data, std::size_t length) override {
             auto recv_bytes = 0;
             while (recv_bytes != length) {
                 recv_bytes += recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
             }
+            return recv_bytes;
         }
 
         virtual void stream_in(std::string& buffer) override {
