@@ -44,7 +44,7 @@ namespace hope::io {
         template<typename TValue>
         TValue read() {
             TValue val;
-            read(&val, sizeof(val));
+            read(val);
             return val;
         }
     };
