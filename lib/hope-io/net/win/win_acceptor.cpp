@@ -33,9 +33,7 @@ namespace {
 
     class win_acceptor final : public hope::io::acceptor {
     public:
-        win_acceptor(std::string_view port) {
-            hope::io::init();
-        }
+        win_acceptor() = default;
 
         virtual ~win_acceptor() override {
             closesocket(m_listen_socket);

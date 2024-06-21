@@ -12,26 +12,27 @@
 #include "hope-io/net/factory.h"
 #include "hope-io/net/tls/tls_init.h"
 
+#ifdef HOPE_IO_USE_OPENSSL
+
 #include "openssl/ssl.h"
 #include "openssl/err.h"
+
+#include <stdexcept>
 
 namespace hope::io {
 
     class base_tls_stream : public stream {
     public:
-        base_tls_stream(stream* tcp_stream) 
+        explicit base_tls_stream(stream* tcp_stream)
             : m_tcp_stream(tcp_stream) {
             if (m_tcp_stream == nullptr) {
                 m_tcp_stream = hope::io::create_stream();
             }
-            
-            hope::io::init_tls();
         }
 
         virtual ~base_tls_stream() override {
             base_tls_stream::disconnect();
             delete m_tcp_stream;
-            hope::io::deinit_tls();
         }
     protected:
 
@@ -55,6 +56,7 @@ namespace hope::io {
 
         virtual void write(const void *data, std::size_t length) override {
             std::size_t total = 0;
+            // TODO:: do we need cycle here?
             do
             {
                 const auto sent = SSL_write(m_ssl, (char*)data + total, length - total);
@@ -65,8 +67,9 @@ namespace hope::io {
             while (total < length);
         }
 
-        virtual void read(void *data, std::size_t length) override {
+        virtual size_t read(void *data, std::size_t length) override {
             std::size_t total = 0;
+            // TODO:: do we need cycle here?
             do
             {
                 const auto received = SSL_read(m_ssl, (char*)data + total, length - total);
@@ -76,7 +79,22 @@ namespace hope::io {
                 total += received;
             }
             while (total < length);
+
+            return total;
         }
+
+        virtual void stream_in(std::string& out_stream) override {
+            constexpr static std::size_t BufferSize{ 1024 };
+            char buffer[BufferSize];
+            int bytes_read = 0;
+            while ((bytes_read = SSL_read(m_ssl, buffer, BufferSize)) > 0) {
+                out_stream.append(buffer, bytes_read);
+            }
+        }
+
+		size_t read_bytes(void* data, std::size_t length) const {
+           return SSL_read(m_ssl, data, length);
+		}
 
         stream* m_tcp_stream{ nullptr };
 
@@ -86,3 +104,4 @@ namespace hope::io {
 
 }
 
+#endif

@@ -2,7 +2,9 @@
 
 #include "openssl/ssl.h"
 #include "openssl/err.h"
+
 #include <mutex>
+#include <cassert>
 
 namespace hope::io {
 
@@ -10,6 +12,7 @@ namespace hope::io {
     static int initialized = 0;
     
     void init_tls() {
+#ifdef HOPE_IO_USE_OPENSSL
         std::lock_guard lock(guard);
         if (initialized == 0){
             SSL_library_init();
@@ -17,15 +20,22 @@ namespace hope::io {
 	        OpenSSL_add_all_algorithms();
         }
         ++initialized;
+#else
+        assert(false && "hope-io/ OpenSSL is not available");
+#endif
     }
 
     void deinit_tls() {
+#ifdef HOPE_IO_USE_OPENSSL
         std::lock_guard lock(guard);
         --initialized;
         if (initialized == 0){
             ERR_free_strings();
 	        EVP_cleanup();
         }
+#else
+        assert(false && "hope-io/ OpenSSL is not available");
+#endif
     }
 
 }

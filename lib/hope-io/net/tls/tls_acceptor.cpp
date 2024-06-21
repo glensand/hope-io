@@ -5,6 +5,8 @@
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
 
+#ifdef HOPE_IO_USE_OPENSSL
+
 namespace {
 
     class tls_server_stream final : public hope::io::base_tls_stream {
@@ -84,3 +86,16 @@ namespace hope::io {
     }
     
 }
+
+#else
+
+namespace hope::io {
+
+    acceptor* create_tls_acceptor(std::string_view key, std::string_view cert) {
+        assert(false && "hope-io/ OpenSSL is not available");
+        return nullptr;
+    }
+
+}
+
+#endif

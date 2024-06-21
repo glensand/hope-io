@@ -1,5 +1,7 @@
 #include "tls_stream.h"
 
+#ifdef HOPE_IO_USE_OPENSSL
+
 namespace {
 
     class client_tls_stream final : public hope::io::base_tls_stream {
@@ -16,8 +18,11 @@ namespace {
             m_ssl = SSL_new(m_context);
             SSL_set_fd(m_ssl, (int32_t)m_tcp_stream->platform_socket());
 
+            // Set the hostname for SNI (Server Name Indication)
+            SSL_set_tlsext_host_name(m_ssl, ip.data());
+
             if (SSL_connect(m_ssl) <= 0) {
-                throw std::runtime_error("hope-io/client_tls_stream: cannot esteblish connection");
+                throw std::runtime_error("hope-io/client_tls_stream: cannot establish connection");
             }
         }
 
@@ -36,3 +41,12 @@ namespace hope::io {
     }
 
 }
+
+#else
+
+    stream* create_tls_stream(stream* tcp_stream) {
+        assert(false && "hope-io/ OpenSSL is not available");
+        return nullptr;
+    }
+
+#endif

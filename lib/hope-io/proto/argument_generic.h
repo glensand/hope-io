@@ -7,8 +7,6 @@
  */
 
 #pragma once
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "modernize-use-override"
 
 #include "hope-io/proto/argument.h"
 
@@ -61,5 +59,3 @@ namespace hope::proto {
     using float64 = argument_generic<double, e_argument_type::float64>;
     using string = argument_generic<std::string, e_argument_type::string>;
 }
-
-#pragma clang diagnostic pop
