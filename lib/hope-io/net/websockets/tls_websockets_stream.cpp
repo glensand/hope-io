@@ -1,6 +1,9 @@
+#include "hope-io/coredefs.h"
+
+#if WEBSOCK_ENABLE
+
 #include <algorithm>
 #include <array>
-#include <ranges>
 #include <unordered_map>
 
 #include "websockets.h"
@@ -110,5 +113,7 @@ stream* create_tls_websockets_stream(stream* tcp_stream) {
     assert(false && "hope-io/ OpenSSL is not available");
     return nullptr;
 }
+
+#endif
 
 #endif

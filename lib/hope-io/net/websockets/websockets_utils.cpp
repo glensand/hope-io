@@ -1,3 +1,7 @@
+#include "hope-io/coredefs.h"
+
+#if WEBSOCK_ENABLE
+
 #include <cassert>
 #include <format>
 
@@ -185,3 +189,4 @@ namespace hope::io::websockets {
     }
 
 }
+#endif

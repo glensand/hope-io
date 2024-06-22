@@ -1,5 +1,9 @@
 #pragma once
 
+#include "hope-io/coredefs.h"
+
+#if WEBSOCK_ENABLE
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -58,3 +62,5 @@ namespace hope::io::websockets {
 	websocket_frame read_frame(stream* stream);
 
 }
+
+#endif
