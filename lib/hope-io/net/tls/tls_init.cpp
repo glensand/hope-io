@@ -1,7 +1,9 @@
 #include "tls_init.h"
 
+#ifdef HOPE_IO_USE_OPENSSL
 #include "openssl/ssl.h"
 #include "openssl/err.h"
+#endif
 
 #include <mutex>
 #include <cassert>

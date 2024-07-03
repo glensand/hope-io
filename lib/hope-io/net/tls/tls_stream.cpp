@@ -44,9 +44,11 @@ namespace hope::io {
 
 #else
 
+namespace hope::io {
     stream* create_tls_stream(stream* tcp_stream) {
         assert(false && "hope-io/ OpenSSL is not available");
         return nullptr;
     }
+}
 
 #endif
