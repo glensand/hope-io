@@ -92,10 +92,6 @@ namespace hope::io {
             }
         }
 
-		size_t read_bytes(void* data, std::size_t length) const {
-           return SSL_read(m_ssl, data, length);
-		}
-
         stream* m_tcp_stream{ nullptr };
 
         ssl_st* m_ssl{ nullptr };
