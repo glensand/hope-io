@@ -31,6 +31,10 @@ namespace {
             host = ip;
         }
 
+        virtual size_t read(void* data, std::size_t length) override {
+            return SSL_read(m_ssl, data, length);
+        }
+
         virtual void write(const void* data, std::size_t length) override {
             assert(!accept_handshake && "Already accepted");
 
@@ -41,8 +45,9 @@ namespace {
             }
             {
                 std::array<char, 8192> header_buffer;
-                if (const auto read_bytes = base_tls_stream::read_bytes(header_buffer.data(), header_buffer.size()))
+                if (const auto read_bytes = read(header_buffer.data(), header_buffer.size()))
                 {
+                    assert(read_bytes < header_buffer.size() && "Header is so big!");
                     accept_handshake = hope::io::websockets::validate_handshake_response(header_buffer.data(), read_bytes);
                 }
             }
@@ -51,34 +56,35 @@ namespace {
         virtual void stream_in(std::string& out_stream) override {
             assert(accept_handshake && "Need to accept a handshake to read packages");
 
-            if (no_more_data) {
-	            return;
-            }
+            while (accept_handshake) {
+                auto&& frame = hope::io::websockets::read_frame(this);
 
-            auto&& frame = hope::io::websockets::read_frame(this);
-
-            // TODO: Critical (Process others frames (eof, long messages, ping/pong))
-            if (!frame.complete_stream() || frame.header.op_code != hope::io::websockets::OPCODE_TEXT) {
-                no_more_data = true;
-	            return;
-            }
-
-            size_t package_length = frame.length;
-
-            std::array<uint8_t, 1024> read_buffer;
-            while (package_length > 0) {
-                const size_t read_chunk = std::min<size_t>(package_length, read_buffer.size());
-                const size_t read_bytes = base_tls_stream::read_bytes(read_buffer.data(), read_chunk);
-
-                if (frame.masked()) {
-	                for (size_t i = 0; i < read_bytes; ++i) {
-                        read_buffer[i] = read_buffer[i] ^ frame.mask[i % frame.mask.size()];
-	                }
+                if (frame.empty()) {
+                    continue;
                 }
 
-                out_stream.append(reinterpret_cast<char*>(read_buffer.data()), read_bytes);
+                if (frame.control()) {
+                    if (frame.ping()) {
+                        std::string control_message;
+                        if (read_data(frame, this, control_message) != 0)
+                        {
+                            auto&& package = generate_package(control_message, hope::io::websockets::opcode_e::pong, true, frame.masked());
+                            base_tls_stream::write(package.data(), package.length());
+                            continue;
+                        }
+                    }
+                    else {
+                        assert(false && "Other frames doesn't support yet");
+                    }
+                    break;
+                }
 
-                package_length = package_length < read_bytes ? 0 : package_length - read_bytes;
+                if (frame.complete_stream()) {
+                    read_data(frame, this, out_stream);
+	                break;
+                }
+
+                assert(false && "Other message types are not supported");
             }
         }
 
@@ -91,7 +97,6 @@ namespace {
     private:
         std::string host;
         bool accept_handshake = false;
-        bool no_more_data = false;
     };
 
 }
