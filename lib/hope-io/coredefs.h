@@ -13,3 +13,15 @@
 #else
 #define ICARUS_NIX
 #endif
+
+#if defined(__clang__)
+#define WEBSOCK_ENABLE 1
+#elif defined(__GNUC__) || defined(__GNUG__)
+#if GCC_VERSION >= 10
+#define WEBSOCK_ENABLE 1
+#else
+#define WEBSOCK_ENABLE 0
+#endif
+#elif defined(_MSC_VER)
+#define WEBSOCK_ENABLE 1
+#endif

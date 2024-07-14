@@ -1,3 +1,7 @@
+#include "hope-io/coredefs.h"
+
+#if WEBSOCK_ENABLE
+
 #include <cassert>
 #include <format>
 
@@ -205,7 +209,7 @@ namespace hope::io::websockets {
     }
 
     std::string generate_package(const std::string& data, opcode_e code, bool is_eof, bool masked) {
-		std::stringstream out_package;
+		    std::stringstream out_package;
         assert(data.size() < minimal_package_content_length && "Supports small content only");
         if (data.size() < minimal_package_content_length) {
             websocket_frame::header_t header{};
@@ -220,3 +224,4 @@ namespace hope::io::websockets {
         return out_package.str();
     }
 }
+#endif

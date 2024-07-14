@@ -32,6 +32,10 @@
 
 namespace {
 
+    auto throw_error(std::string msg, int code){
+        throw std::runtime_error(msg + std::to_string(code));
+    }
+
     class win_stream final : public hope::io::stream {
     public:
         explicit win_stream(unsigned long long in_socket) {
@@ -52,10 +56,16 @@ namespace {
             return (int32_t)m_socket;
         }
 
+        virtual void set_options(const options& options) override {
+            if (m_socket != INVALID_SOCKET)
+                throw_error("hope-io/win_stream: cannot set options when the socket is connected:", WSAGetLastError());
+            m_options = options;
+        }
+
         virtual void connect(const std::string_view ip, std::size_t port) override {
             // just clear entire structures
             if (m_socket != INVALID_SOCKET)
-                throw std::runtime_error("hope-io/win_stream: had already been connected");
+                throw_error("hope-io/win_stream: had already been connected", WSAGetLastError());
 
             addrinfo* result_addr_info{ nullptr };
             addrinfo hints_addr_info{ };
@@ -77,7 +87,7 @@ namespace {
 
             if (result != 0) {
                 // todo:: add addr to the exception, add log
-                throw std::runtime_error("hope-io/win_stream: could not resolve address");
+                throw_error("hope-io/win_stream: could not resolve address", WSAGetLastError());
             }
 
             m_socket = INVALID_SOCKET;
@@ -88,22 +98,49 @@ namespace {
                 m_socket = ::socket(address_info->ai_family, address_info->ai_socktype, address_info->ai_protocol);
                 if (m_socket != INVALID_SOCKET)
                 {
-                    int on = 1;
-                    int error = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
-                    if (error == 0) {
-                        error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
-                    }
-
-                    if (error == SOCKET_ERROR) {
+                    u_long mode = 1;
+                    if (ioctlsocket(m_socket, FIONBIO, &mode) != 0) {
                         closesocket(m_socket);
                         m_socket = INVALID_SOCKET;
+                    } else {
+                        int on = 1;
+                        int error = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
+                        error |= setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&m_options.read_timeout, sizeof(m_options.read_timeout));
+                        error |= setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&m_options.write_timeout, sizeof(m_options.write_timeout));
+                        if (error == NO_ERROR) {
+                            error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
+                            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                                error = NO_ERROR;
+                                mode = 0;
+                                error |= ioctlsocket(m_socket, FIONBIO, &mode);
+                                fd_set write, err;
+                                FD_ZERO(&write);
+                                FD_ZERO(&err);
+                                FD_SET(m_socket, &write);
+                                FD_SET(m_socket, &err);
+
+                                TIMEVAL timeout;
+                                timeout.tv_sec = m_options.connection_timeout / 1000;
+                                timeout.tv_usec = m_options.connection_timeout - timeout.tv_sec * 1000;
+                                // check if the socket is ready
+                                select(0, NULL, &write, &err, &timeout);			
+                                if(!FD_ISSET(m_socket, &write)) {
+                                    error = SOCKET_ERROR;
+                                }
+                            }
+                        }
+
+                        if (error == SOCKET_ERROR) {
+                            closesocket(m_socket);
+                            m_socket = INVALID_SOCKET;
+                        }
                     }
                 }
             }
 
             if (m_socket == INVALID_SOCKET) {
                 // todo:: add addr to the exception, add log
-                throw std::runtime_error("hope-io/win_stream: Could not connect socket");
+                throw_error("hope-io/win_stream: Could not connect socket", WSAGetLastError());
             }
         }
 
@@ -117,7 +154,7 @@ namespace {
             const auto sent = send(m_socket, (const char*)data, (int)length, 0);
             if (sent == SOCKET_ERROR) {
                 // TODO use WSAGetLastError
-                throw std::runtime_error("hope-io/win_stream: Failed to send data");
+                throw_error("hope-io/win_stream: Failed to send data", WSAGetLastError());
             }
 
             assert(static_cast<std::size_t>(sent) == length);
@@ -129,7 +166,7 @@ namespace {
                 const auto received = recv(m_socket, buffer, static_cast<int>(length), 0);
                 if (received < 0) {
                     // TODO use WSAGetLastError
-                    throw std::runtime_error("hope-io/win_stream: Failed to receive data");
+                    throw_error("hope-io/win_stream: Failed to receive data", WSAGetLastError());
                 }
                 length -= received;
                 buffer += received;
@@ -142,6 +179,7 @@ namespace {
         }
 
         SOCKET m_socket{ INVALID_SOCKET };
+        options m_options;
     };
 
 }

@@ -42,24 +42,6 @@ namespace {
     private:
 
         virtual void open(std::size_t port) override {
-            // TODO:: use to_chars
-            connect(std::to_string(port));
-        }
-
-        virtual hope::io::stream* accept() override {
-            if (const auto connected = ::listen(m_listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
-                throw std::runtime_error("hope-io/win_acceptor: listen failed");
-            }
-
-            const auto new_socket = ::accept(m_listen_socket, nullptr, nullptr);
-            if (new_socket == INVALID_SOCKET) {
-                throw std::runtime_error("hope-io/win_acceptor: accept failed");
-            }
-
-            return hope::io::create_stream(new_socket);
-        }
-
-        void connect(std::string_view port) {
             addrinfo* result = nullptr;
             addrinfo hints;
 
@@ -69,7 +51,7 @@ namespace {
             hints.ai_protocol = IPPROTO_TCP;
             hints.ai_flags = AI_PASSIVE;
 
-            if (const auto got = getaddrinfo(nullptr, port.data(), &hints, &result); got != 0) {
+            if (const auto got = getaddrinfo(nullptr, std::to_string(port).data(), &hints, &result); got != 0) {
                 // TODO:: add port + address
                 throw std::runtime_error("hope-io/win_acceptor: Cannot resolve address and port");
             }
@@ -88,6 +70,19 @@ namespace {
             }
 
             freeaddrinfo(result);
+
+            if (const auto connected = ::listen(m_listen_socket, SOMAXCONN); connected == SOCKET_ERROR) {
+                throw std::runtime_error("hope-io/win_acceptor: listen failed");
+            }
+        }
+
+        virtual hope::io::stream* accept() override {
+            const auto new_socket = ::accept(m_listen_socket, nullptr, nullptr);
+            if (new_socket == INVALID_SOCKET) {
+                throw std::runtime_error("hope-io/win_acceptor: accept failed");
+            }
+
+            return hope::io::create_stream(new_socket);
         }
 
         SOCKET m_listen_socket{ INVALID_SOCKET };

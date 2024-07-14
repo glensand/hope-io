@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.11)
 
 project(hope-io)
 
@@ -41,8 +41,7 @@ if (OPENSSL_FOUND)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
     include_directories(${OPENSSL_INCLUDE_DIR})
 
-    target_link_libraries(${PROJECT_NAME} OpenSSL::Crypto)
-    target_link_libraries(${PROJECT_NAME} OpenSSL::SSL)
+    target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES})
 else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
 endif ()

@@ -24,8 +24,9 @@ public:
         stream_impl.write((const char*)data, length);
     }
 
-    virtual void read(void* data, std::size_t length) override {
+    virtual size_t read(void* data, std::size_t length) override {
         stream_impl.read((char*)data, length);
+        return length;
     }
 
 private:

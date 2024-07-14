@@ -1,5 +1,9 @@
 #pragma once
 
+#include "hope-io/coredefs.h"
+
+#if WEBSOCK_ENABLE
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -86,3 +90,5 @@ namespace hope::io::websockets {
 
 	std::string generate_package(const std::string& data, opcode_e code, bool is_eof, bool masked);
 }
+
+#endif

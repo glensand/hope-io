@@ -14,12 +14,24 @@
 
 namespace hope::io {
 
+    // TODO:: need to split streams somehow, add sync/async versions
+    // async version should have program side store buffer, and possibility to submit buffer data with single batch
     class stream {
     public:
         virtual ~stream() = default;
 
+        struct options final {
+            uint32_t connection_timeout = 300; // msec
+            uint32_t read_timeout = 300; // msec
+            uint32_t write_timeout = 300; // msec
+            uint32_t write_buffer_size = 8096; // bytes
+        };
+
         [[nodiscard]] virtual std::string get_endpoint() const = 0;
         [[nodiscard]] virtual int32_t platform_socket() const = 0;
+
+        // TODO:: this methos need to be fully virtual
+        virtual void set_options(const options&){}
 
         virtual void connect(std::string_view ip, std::size_t port) = 0;
         virtual void disconnect() = 0;
@@ -27,6 +39,7 @@ namespace hope::io {
         virtual void write(const void *data, std::size_t length) = 0;
         virtual size_t read(void *data, std::size_t length) = 0;
 
+        // TODO:: need to be removed in future
         virtual void stream_in(std::string& buffer) = 0;
 
         template<typename TValue>
@@ -54,7 +67,7 @@ namespace hope::io {
     // TODO:: string_view
     template <>
     inline void stream::read<std::string>(std::string& val) {
-        if (const auto size = read<std::size_t>(); size > 0) {
+        if (const auto size = read<uint64_t>(); size > 0) {
             auto* buffer = new char [size];
             read(buffer, size);
             val = std::string(buffer, size);
@@ -63,7 +76,7 @@ namespace hope::io {
 
     template <>
     inline void stream::write<std::string>(const std::string& val) {
-        write(val.size());
+        write((uint64_t)val.size());
         write(val.c_str(), val.size());
     }
 }
