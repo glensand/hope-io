@@ -69,7 +69,6 @@ namespace hope::io {
 
         virtual size_t read(void *data, std::size_t length) override {
             std::size_t total = 0;
-            // TODO:: do we need cycle here?
             do
             {
                 const auto received = SSL_read(m_ssl, (char*)data + total, length - total);
@@ -81,6 +80,14 @@ namespace hope::io {
             while (total < length);
 
             return total;
+        }
+
+        virtual size_t read_once(void* data, std::size_t length) override {
+            const auto received = SSL_read(m_ssl, (char*)data, (int)length - 1);
+            if (received <= 0)
+                throw std::runtime_error("hope-io/tls_stream: cannot read from socket");
+
+            return received;
         }
 
         virtual void stream_in(std::string& out_stream) override {

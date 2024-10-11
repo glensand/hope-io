@@ -86,6 +86,11 @@ namespace {
             return 0;
         }
 
+        virtual size_t read_once(void* data, std::size_t length) override {
+            assert(false);
+            return 0;
+        }
+
         virtual void stream_in(std::string& buffer) override {
             assert(false && "Not implemented");
         }

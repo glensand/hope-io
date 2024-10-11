@@ -19,3 +19,8 @@ foreach(source ${SAMPLE_CORE_SOURCES})
     target_link_libraries(${target_name} hope-io)
 
 endforeach()
+
+# Example frontend dir for http_server.cpp sample
+execute_process(
+    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    COMMAND git clone https://github.com/rasskazovpavel/onpoint)

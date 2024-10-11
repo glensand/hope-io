@@ -174,6 +174,15 @@ namespace {
             return length;
         }
 
+        virtual size_t read_once(void* data, std::size_t length) override {
+            const auto received = recv(m_socket, (char*)data, length - 1, 0);
+            if (received < 0) {
+                // TODO use WSAGetLastError
+                throw_error("hope-io/win_stream: Failed to receive data", WSAGetLastError());
+            }
+            return received;
+        }
+
         virtual void stream_in(std::string& buffer) override {
             assert(false && "Not implemented");
         }
