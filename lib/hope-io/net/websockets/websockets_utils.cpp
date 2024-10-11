@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <ranges>
 #include <algorithm>
+#include <sstream>
 
 #ifdef HOPE_IO_USE_OPENSSL
 #include "openssl/bio.h"
@@ -65,6 +66,35 @@ namespace {
 
     std::string base64_key_encode(size_t length) {
         return base64_encode(random_bytes(length));
+    }
+
+    constexpr auto minimal_package_content_length = 126u;
+
+    size_t read_content_length(hope::io::stream* stream, uint8_t package_length)
+    {
+        size_t out_package_length = package_length;
+
+        std::uint8_t extra_length_bytes = 0;
+        if (package_length == minimal_package_content_length) {
+            extra_length_bytes = 0x2;
+        }
+        else if (package_length == 127u) {
+            extra_length_bytes = 0x8;
+        }
+
+        if (extra_length_bytes > 0) {
+            std::vector<std::uint8_t> data_length_buffer(extra_length_bytes);
+            if (stream->read(data_length_buffer.data(), data_length_buffer.size()) != data_length_buffer.size()) {
+                return false;
+            }
+
+            out_package_length = 0ull;
+            for (auto&& i = 0; i < extra_length_bytes; i++) {
+                out_package_length = (out_package_length << 0x8) + data_length_buffer[i];
+            }
+        }
+
+        return out_package_length;
     }
 }
 
@@ -143,42 +173,10 @@ namespace hope::io::websockets {
 
     websocket_frame read_frame(stream* stream) {
 		assert(stream && "stream must be valid");
-        websocket_frame frame;
+        websocket_frame frame{};
         if (stream->read(&frame.header, websocket_frame::header_size) == websocket_frame::header_size) {
-            static auto&& read_package_length = [&](size_t& out_package_length) {
-                std::uint8_t extra_length_bytes = 0;
-                const auto package_length = frame.header.package_length;
-                if (package_length == 126u) {
-                    extra_length_bytes = 0x2;
-                }
-                else if (package_length == 127u) {
-                    extra_length_bytes = 0x8;
-                }
-
-                out_package_length = package_length;
-
-                if (extra_length_bytes > 0) {
-                    std::vector<std::uint8_t> data_length_buffer(extra_length_bytes);
-                    if (stream->read(data_length_buffer.data(), data_length_buffer.size()) != data_length_buffer.size()) {
-                        return false;
-                    }
-
-                    out_package_length = 0ull;
-                    for (auto&& i = 0; i < extra_length_bytes; i++) {
-                        out_package_length = (out_package_length << 0x8) + data_length_buffer[i];
-                    }
-                }
-                else {
-                    out_package_length = package_length;
-                }
-
-                return true;
-                };
-
-            size_t package_length;
-            if (read_package_length(package_length)) {
-                frame.length = package_length;
-            }
+			
+            frame.length = read_content_length(stream, frame.header.package_length);
 
             if (frame.masked()) {
                 stream->read(frame.mask.data(), frame.mask.size());
@@ -188,5 +186,42 @@ namespace hope::io::websockets {
         return frame;
     }
 
+    size_t read_data(const websocket_frame& frame, stream* stream, std::string& out_data) {
+        size_t package_length = frame.length;
+
+        std::array<uint8_t, 1024> read_buffer;
+        while (package_length > 0) {
+            const size_t read_chunk = std::min<size_t>(package_length, read_buffer.size());
+            const size_t read_bytes = stream->read(read_buffer.data(), read_chunk);
+
+            if (frame.masked()) {
+                for (size_t i = 0; i < read_bytes; ++i) {
+                    read_buffer[i] = read_buffer[i] ^ frame.mask[i % frame.mask.size()];
+                }
+            }
+
+            out_data.append(reinterpret_cast<char*>(read_buffer.data()), read_bytes);
+
+            package_length = package_length < read_bytes ? 0 : package_length - read_bytes;
+        }
+
+        return frame.length - package_length;
+    }
+
+    std::string generate_package(const std::string& data, opcode_e code, bool is_eof, bool masked) {
+		    std::stringstream out_package;
+        assert(data.size() < minimal_package_content_length && "Supports small content only");
+        if (data.size() < minimal_package_content_length) {
+            websocket_frame::header_t header{};
+            header.op_code = cast_opcode(code);
+            header.is_eof = is_eof;
+            header.package_length = static_cast<uint8_t>(data.size());
+            header.mask = masked;
+            out_package << std::string_view(reinterpret_cast<const char*>(&header), websocket_frame::header_size);
+        }
+        assert(!masked && "Doesn't support masked");
+        out_package << data;
+        return out_package.str();
+    }
 }
 #endif
