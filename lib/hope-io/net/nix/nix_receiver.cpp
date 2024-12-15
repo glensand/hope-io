@@ -96,6 +96,10 @@ namespace {
             assert(false && "Not implemented");
         }
 
+        virtual void set_options(const hope::io::stream_options&) override {
+            assert(false && "Not implemented");
+        }
+        
         int m_socket{ 0 };
 
         struct sockaddr_in serv_addr{};

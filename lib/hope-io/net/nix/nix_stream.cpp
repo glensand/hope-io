@@ -100,6 +100,24 @@ namespace {
             assert(false && "Not implemented");
         }
 
+        virtual void set_options(const hope::io::stream_options& opt) {
+            assert(m_socket != 0);
+            struct timeval timeout;
+            timeout.tv_sec = opt.write_timeout / 1000;
+            timeout.tv_usec = opt.write_timeout - timeout.tv_sec * 1000;
+            if (setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set write timeout: " +
+                                         std::string(strerror(errno)));
+            }
+
+            timeout.tv_sec = opt.write_timeout / 1000;
+            timeout.tv_usec = opt.write_timeout - timeout.tv_sec * 1000;
+            if (setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set read timeout: " +
+                                         std::string(strerror(errno)));
+            }
+        }
+
         int m_socket{ 0 };
     };
 

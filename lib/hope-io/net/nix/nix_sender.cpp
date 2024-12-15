@@ -94,6 +94,10 @@ namespace {
         virtual void stream_in(std::string& buffer) override {
             assert(false && "Not implemented");
         }
+
+        virtual void set_options(const hope::io::stream_options&) override {
+            assert(false && "Not implemented");
+        }
         
         int m_socket{ 0 };
 

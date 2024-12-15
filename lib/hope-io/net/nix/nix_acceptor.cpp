@@ -40,7 +40,9 @@ namespace {
             if ((client_socket = ::accept(m_socket, (struct sockaddr *)&client_sockaddr, &sin_size)) == -1) {
                 throw std::runtime_error("hope-io/nix_acceptor: cannot accept connection");
             }
-            return hope::io::create_stream((unsigned long long)client_socket);
+            auto* stream = hope::io::create_stream((unsigned long long)client_socket);
+            stream->set_options(m_options);
+            return stream;
         }
 
         virtual void open(std::size_t port) override {
@@ -64,7 +66,12 @@ namespace {
             listen(m_socket, backlog);
         }
 
+        virtual void set_options(const hope::io::stream_options& opt) override {
+            m_options = opt;
+        }
+
         int m_socket{ -1 };
+        hope::io::stream_options m_options;
     };
 
 }

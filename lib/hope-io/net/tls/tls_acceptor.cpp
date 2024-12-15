@@ -71,6 +71,11 @@ namespace {
             return tls_stream;
         }
 
+        virtual void set_options(const hope::io::stream_options& opt) override {
+            assert(m_tcp_acceptor);
+            m_tcp_acceptor->set_options(opt);
+        }
+
         std::string m_key;
         std::string m_cert;
 

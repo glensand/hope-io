@@ -19,6 +19,7 @@ namespace hope::io {
 
         virtual ~acceptor() = default;
 
+        virtual void set_options(const struct stream_options& opt) = 0;
         virtual void open(std::size_t port) = 0;
         virtual class stream* accept() = 0;
     };

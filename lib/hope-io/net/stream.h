@@ -14,24 +14,24 @@
 
 namespace hope::io {
 
+    struct stream_options final {
+        uint32_t connection_timeout = 3000; // msec
+        uint32_t read_timeout = 3000; // msec
+        uint32_t write_timeout = 3000; // msec
+        uint32_t write_buffer_size = 8096; // bytes
+    };
+
     // TODO:: need to split streams somehow, add sync/async versions
     // async version should have program side store buffer, and possibility to submit buffer data with single batch
     class stream {
     public:
         virtual ~stream() = default;
 
-        struct options final {
-            uint32_t connection_timeout = 300; // msec
-            uint32_t read_timeout = 300; // msec
-            uint32_t write_timeout = 300; // msec
-            uint32_t write_buffer_size = 8096; // bytes
-        };
-
         [[nodiscard]] virtual std::string get_endpoint() const = 0;
         [[nodiscard]] virtual int32_t platform_socket() const = 0;
 
-        // TODO:: this methos need to be fully virtual
-        virtual void set_options(const options&){}
+
+        virtual void set_options(const stream_options&) = 0;
 
         virtual void connect(std::string_view ip, std::size_t port) = 0;
         virtual void disconnect() = 0;

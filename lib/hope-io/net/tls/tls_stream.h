@@ -103,6 +103,10 @@ namespace hope::io {
            return SSL_read(m_ssl, data, length);
 		}
 
+        virtual void set_options(const hope::io::stream_options& opt) override {
+            assert(m_tcp_stream);
+            m_tcp_stream->set_options(opt);
+        }
         stream* m_tcp_stream{ nullptr };
 
         ssl_st* m_ssl{ nullptr };
