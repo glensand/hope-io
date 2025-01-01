@@ -20,6 +20,8 @@ public:
     virtual void connect(std::string_view ip, std::size_t port) override {}
     virtual void disconnect() override {}
     virtual void stream_in(std::string& buffer) override {}
+    virtual void set_options(const hope::io::stream_options&) override {}
+    virtual size_t read_once(void* data, std::size_t length) override { return 0; }
     virtual void write(const void* data, std::size_t length) override {
         stream_impl.write((const char*)data, length);
     }

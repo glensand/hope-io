@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
     auto* stream = hope::io::create_stream();
     try {
         stream->connect("localhost", 1338);
+        stream->set_options({});
         message msg{ argv[1], "hello" };
         for (; msg.text != "exit"; std::cin >> msg.text) {
             msg.send(*stream);

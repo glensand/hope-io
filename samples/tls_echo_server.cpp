@@ -24,6 +24,8 @@ int main(int argc, char *argv[]) {
     acceptor->open(1339);
 
     auto* connection = acceptor->accept();
+    hope::io::stream_options options;
+    connection->set_options(options);
     while (true) {
         message msg;
         msg.recv(*connection);

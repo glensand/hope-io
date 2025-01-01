@@ -14,6 +14,8 @@
 #include "hope-io/net/init.h"
 
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 int main(int argc, char *argv[]) {
     try {
@@ -22,13 +24,18 @@ int main(int argc, char *argv[]) {
         acceptor->open(1338);
 
         auto* connection = acceptor->accept();
+        hope::io::stream_options options;
+        connection->set_options(options);
         while (true) {
             message msg;
             msg.recv(*connection);
-            std::cout << "new msg[" << msg.name << ":" << msg.text << "]\n"; 
+            std::cout << "new msg[" << msg.name << ":" << msg.text << "]\n";
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(10s);
             msg.send(*connection);
             std::cout << "sent\n";
         }
+        delete connection;
     } catch(const std::exception& e) {
         std::cout << e.what();
     }

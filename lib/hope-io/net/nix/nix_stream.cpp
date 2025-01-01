@@ -80,14 +80,24 @@ namespace {
         virtual void write(const void* data, std::size_t length) override {
             auto bytes_sent = 0;
             while (bytes_sent != length) {
-                bytes_sent += send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
+                auto op_res = send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
+                if (op_res == -1){
+                    throw std::runtime_error("hope-io/nix_stream [tcp]: cannot write to stream: " +
+                                         std::string(strerror(errno)));
+                }
+                bytes_sent += op_res;
             }
         }
 
         virtual size_t read(void* data, std::size_t length) override {
             auto recv_bytes = 0;
             while (recv_bytes != length) {
-                recv_bytes += recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
+                auto op_res = recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
+                if (op_res == -1){
+                    throw std::runtime_error("hope-io/nix_stream [tcp]: cannot read from stream: " +
+                                         std::string(strerror(errno)));
+                }
+                recv_bytes += recv_bytes;
             }
             return recv_bytes;
         }
@@ -100,18 +110,18 @@ namespace {
             assert(false && "Not implemented");
         }
 
-        virtual void set_options(const hope::io::stream_options& opt) {
+        virtual void set_options(const hope::io::stream_options& opt) override {
             assert(m_socket != 0);
             struct timeval timeout;
             timeout.tv_sec = opt.write_timeout / 1000;
-            timeout.tv_usec = opt.write_timeout - timeout.tv_sec * 1000;
+            timeout.tv_usec = 1000 * (opt.write_timeout - timeout.tv_sec * 1000);
             if (setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set write timeout: " +
                                          std::string(strerror(errno)));
             }
 
-            timeout.tv_sec = opt.write_timeout / 1000;
-            timeout.tv_usec = opt.write_timeout - timeout.tv_sec * 1000;
+            timeout.tv_sec = opt.read_timeout / 1000;
+            timeout.tv_usec = 1000 * (opt.read_timeout - timeout.tv_sec * 1000);
             if (setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set read timeout: " +
                                          std::string(strerror(errno)));
