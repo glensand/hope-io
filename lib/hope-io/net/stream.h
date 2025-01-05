@@ -19,6 +19,7 @@ namespace hope::io {
         uint32_t read_timeout = 3000; // msec
         uint32_t write_timeout = 3000; // msec
         uint32_t write_buffer_size = 8096; // bytes
+        bool non_block_mode = false;
     };
 
     // TODO:: need to split streams somehow, add sync/async versions

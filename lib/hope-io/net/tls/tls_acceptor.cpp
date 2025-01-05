@@ -76,6 +76,10 @@ namespace {
             m_tcp_acceptor->set_options(opt);
         }
 
+        virtual long long raw() const override {
+            return m_tcp_acceptor->raw();
+        }
+
         std::string m_key;
         std::string m_cert;
 

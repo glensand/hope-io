@@ -25,6 +25,7 @@
 #include <cerrno>
 #include <cstring>
 #include <netinet/in.h>
+#include <stdexcept>
 
 namespace {
 
@@ -68,7 +69,21 @@ namespace {
 
         virtual void set_options(const hope::io::stream_options& opt) override {
             m_options = opt;
+            // for listen socket we can set block mode, also need to set connect timeout
+            int flags = fcntl(m_socket, F_GETFL, 0);
+            if (flags == -1) {
+                throw std::runtime_error("hope-io/nix_acceptor [tcp]: cannot get socket flags: " +
+                                         std::string(strerror(errno)));
+            }
+
+            flags = opt.non_block_mode ? flags | O_NONBLOCK : flags & (~O_NONBLOCK);
+            if (fcntl(m_socket, F_SETFL, flags) == -1) {
+                throw std::runtime_error("hope-io/nix_acceptor [tcp]: cannot set non-block flag: " +
+                                         std::string(strerror(errno)));
+            }
         }
+
+        virtual long long raw() const override { return m_socket; }
 
         int m_socket{ -1 };
         hope::io::stream_options m_options;

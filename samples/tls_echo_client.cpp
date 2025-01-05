@@ -28,10 +28,14 @@ int main(int argc, char *argv[]) {
     try {
         stream->connect("localhost", 1339);
         message msg{ argv[1] };
-        for (; std::cin >> msg.text; msg.text != "exit") {
-            msg.send(*stream);
-            msg.recv(*stream);
-            std::cout << "recv msg[" << msg.name << ":" << msg.text << "]\n"; 
+        for (; std::cin >> msg.text;) {
+            if (msg.text != "exit") {
+                msg.send(*stream);
+                msg.recv(*stream);
+                std::cout << "recv msg[" << msg.name << ":" << msg.text << "]\n"; 
+            } else {
+                break;
+            }
         }
     }
     catch (const std::exception& ex) {

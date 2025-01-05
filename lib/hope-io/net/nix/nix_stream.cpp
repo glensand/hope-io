@@ -21,6 +21,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 
 namespace {
@@ -93,7 +94,7 @@ namespace {
             auto recv_bytes = 0;
             while (recv_bytes != length) {
                 auto op_res = recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
-                if (op_res == -1){
+                if (op_res == -1) {
                     throw std::runtime_error("hope-io/nix_stream [tcp]: cannot read from stream: " +
                                          std::string(strerror(errno)));
                 }
@@ -124,6 +125,18 @@ namespace {
             timeout.tv_usec = 1000 * (opt.read_timeout - timeout.tv_sec * 1000);
             if (setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set read timeout: " +
+                                         std::string(strerror(errno)));
+            }
+            
+            int flags = fcntl(m_socket, F_GETFL, 0);
+            if (flags == -1) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot get socket flags: " +
+                                         std::string(strerror(errno)));
+            }
+
+            flags = opt.non_block_mode ? flags | O_NONBLOCK : flags & (~O_NONBLOCK);
+            if (fcntl(m_socket, F_SETFL, flags) == -1) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set non-block flag: " +
                                          std::string(strerror(errno)));
             }
         }
