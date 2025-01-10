@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 namespace {
 
@@ -79,7 +80,7 @@ namespace {
         }
 
         virtual void write(const void* data, std::size_t length) override {
-            auto bytes_sent = 0;
+            std::size_t bytes_sent = 0;
             while (bytes_sent != length) {
                 auto op_res = send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
                 if (op_res == -1){
@@ -91,7 +92,7 @@ namespace {
         }
 
         virtual size_t read(void* data, std::size_t length) override {
-            auto recv_bytes = 0;
+            std::size_t recv_bytes = 0;
             while (recv_bytes != length) {
                 auto op_res = recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
                 if (op_res == -1) {
