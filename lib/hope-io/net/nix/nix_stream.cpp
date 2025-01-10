@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <sys/time.h>
 
 namespace {
 
