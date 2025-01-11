@@ -28,6 +28,7 @@ file(GLOB CL_SOURCES
     hope-io/net/nix/*.cpp
     hope-io/net/tls/*.cpp
     hope-io/net/websockets/*.cpp
+    hope-io/net/linux/*.cpp
 )
 
 add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})

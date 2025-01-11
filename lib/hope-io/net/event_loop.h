@@ -65,11 +65,12 @@ namespace hope::io {
             }
 
             void reset() {
-                m_head = m_tail = 0;
+                m_head = 0;
+                m_tail = 0;
             }
 
             bool is_empty() const {
-                return m_tail == m_head == 0;
+                return count() == 0;
             }
 
             void handle_write(std::size_t bytes) {

@@ -14,30 +14,64 @@
 #include "hope-io/net/init.h"
 
 #include <iostream>
+#include <utility>
+
+void on_connect(hope::io::event_loop::connection& c) {
+    c.set_state(hope::io::event_loop::connection_state::read);
+}
+
+void on_read(hope::io::event_loop::connection& c) {
+    const auto local_data = c.buffer->used_chunk();
+    const auto message_length = local_data.second;
+    if (message_length >= sizeof(uint32_t)) {
+        // if we have enought data, lets try to read it
+        auto string_length = *((uint32_t*)local_data.first);
+        // so we have enough data to read whole message, read it now
+        // otherwise will read later (need to wait a bit)
+        if (string_length == message_length - sizeof(uint32_t)) {
+            const char* p_text = ((char*)local_data.first + sizeof(uint32_t));
+            std::string_view text(p_text, string_length);
+            std::cout << "Got message:" << text << "\n";
+
+            c.buffer->reset();
+            // set buffer pointer to read pos to echo msg
+            c.buffer->handle_write(local_data.second);
+            c.set_state(hope::io::event_loop::connection_state::write);
+        } 
+    }
+}
+
+void on_write(hope::io::event_loop::connection& c) {
+    c.set_state(hope::io::event_loop::connection_state::read);
+}
+
+void on_err(hope::io::event_loop::connection& c, const std::string& what) {
+    std::cout << "Err occured:" << what << "\n";
+}
 
 int main() {
-    #if 0
-        try {
+    try {
         hope::io::init();
         auto* loop = hope::io::create_event_loop();
-        //hope::io
-        loop->open(1338);
+        
+        hope::io::event_loop::callbacks cb{
+            [](auto& c) {
+                on_connect(c);
+            },
+            [](auto& c) {
+                on_read(c);
+            },
+            [](auto& c) {
+                on_write(c);
+            },
+            [](auto& c, const std::string& what) {
+                on_err(c, what);
+            },
+        };
 
-        auto* connection = acceptor->accept();
-        hope::io::stream_options options;
-        connection->set_options(options);
-        while (true) {
-            message msg;
-            msg.recv(*connection);
-            std::cout << "new msg[" << msg.name << ":" << msg.text << "]\n";
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(10s);
-            msg.send(*connection);
-            std::cout << "sent\n";
-        }
-        delete connection;
+        loop->run(1338, std::move(cb));
     } catch(const std::exception& e) {
         std::cout << e.what();
     }
-    #endif
+    return 0;
 }

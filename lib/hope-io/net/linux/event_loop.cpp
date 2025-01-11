@@ -13,10 +13,11 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <iostream>
 
 namespace hope::io { 
 
-    event_loop *hope::io::create_event_loop() {
+    event_loop* create_event_loop() {
         class event_loop_linux final : public event_loop {
         public:
             event_loop_linux() = default;
@@ -48,7 +49,6 @@ namespace hope::io {
             };
             
             virtual void run(std::size_t port, callbacks&& cb) override {
-                
                 // TODO:: multiport option?
                 auto acceptor = create_acceptor();
                 acceptor->open(port);
@@ -62,7 +62,6 @@ namespace hope::io {
 
                 while (m_running.load(std::memory_order_acquire)) {
                     poll_args.clear();
-                    struct pollfd pfd = {};
                     poll_args.emplace_back(acceptor->raw(), POLLIN, 0);
 
                     // fill active connections
@@ -173,6 +172,8 @@ namespace hope::io {
                                     } else if (op_res > 0){
                                         conn.buffer->handle_read(op_res);
                                         conn.buffer->shrink();
+                                        std::cout << "written:" << op_res << "bytes" << std::endl;
+                                        assert((conn.buffer->count() == 0) == conn.buffer->is_empty());
                                         if (conn.buffer->is_empty()) {
                                             cb.on_write(conn);
                                         }
