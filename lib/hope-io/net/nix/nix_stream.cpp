@@ -100,7 +100,7 @@ namespace {
                     throw std::runtime_error("hope-io/nix_stream [tcp]: cannot read from stream: " +
                                          std::string(strerror(errno)));
                 }
-                recv_bytes += recv_bytes;
+                recv_bytes += op_res;
             }
             return recv_bytes;
         }

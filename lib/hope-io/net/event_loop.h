@@ -24,7 +24,7 @@ namespace hope::io {
         struct buffer final {
             // tries to write specified amount of data to the buffer
             // returns count actually written
-            std::size_t write(void* data, std::size_t size) {
+            std::size_t write(const void* data, std::size_t size) {
                 const auto free_space = m_impl.size() - m_tail;
                 if (size > free_space) {
                     size = free_space;

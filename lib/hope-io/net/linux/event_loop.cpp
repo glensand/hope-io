@@ -169,10 +169,9 @@ namespace hope::io {
                                     if (op_res <= 0 && errno != EAGAIN) {
                                         cb.on_err(conn, "Cannot write to socket, close connection");
                                         conn.set_state(connection_state::die);
-                                    } else if (op_res > 0){
+                                    } else if (op_res > 0) {
                                         conn.buffer->handle_read(op_res);
                                         conn.buffer->shrink();
-                                        std::cout << "written:" << op_res << "bytes" << std::endl;
                                         assert((conn.buffer->count() == 0) == conn.buffer->is_empty());
                                         if (conn.buffer->is_empty()) {
                                             cb.on_write(conn);
