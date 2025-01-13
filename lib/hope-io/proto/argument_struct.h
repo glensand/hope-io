@@ -9,6 +9,8 @@
 
 #include "hope-io/proto/argument_container.h"
 
+#include <algorithm>
+
 namespace hope::proto{
 
     class argument_struct final : public argument, public argument_container {
@@ -38,6 +40,17 @@ namespace hope::proto{
             return arg->as<T>();
         }
 
+        auto release(const std::string& name) {
+            argument* res = nullptr;
+            auto it = std::remove_if(begin(values), end(values), 
+                [&](const auto* arg) { return arg->get_name() == name; });
+            if (it != end(values)) {
+                values.erase(it);
+                res = *it;
+            }
+            return res;
+        }
+
     private:
         argument_struct(std::string&& in_name, std::vector<argument*>&& args)
             : argument(std::move(in_name), e_argument_type::struct_value)
@@ -64,10 +77,17 @@ namespace hope::proto{
             return *this;
         }
 
+        struct_builder& add(argument* in_argument) {
+            if (in_argument) {
+                values.emplace_back(in_argument);
+            }
+            return *this;
+        }
+
         argument_struct* get(std::string&& name) {
             return new argument_struct(std::move(name), std::move(values));
         }
-
+ 
         virtual ~struct_builder(){
             assert(values.empty());
         }

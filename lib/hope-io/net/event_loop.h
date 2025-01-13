@@ -22,9 +22,10 @@ namespace hope::io {
         // it may looks like that:
         // | unsued spacer | payload | slack |                  
         struct buffer final {
+            using buffer_impl = std::array<unsigned char, 8096>;
             // tries to write specified amount of data to the buffer
             // returns count actually written
-            std::size_t write(const void* data, std::size_t size) {
+            std::size_t write(const void* data, std::size_t size) noexcept {
                 const auto free_space = m_impl.size() - m_tail;
                 if (size > free_space) {
                     size = free_space;
@@ -35,7 +36,7 @@ namespace hope::io {
                 return size;
             }
             
-            std::size_t read(void* data, std::size_t size) {
+            std::size_t read(void* data, std::size_t size) noexcept {
                 if (count() > size) {
                     size = count();
                 }
@@ -45,15 +46,15 @@ namespace hope::io {
                 return size;
             }
 
-            std::pair<const void*, std::size_t> free_chunk() const {
+            std::pair<const void*, std::size_t> free_chunk() const noexcept {
                 return { m_impl.data() + m_tail, m_impl.size() - m_tail };
             }
 
-            std::pair<const void*, std::size_t> used_chunk() const {
+            std::pair<const void*, std::size_t> used_chunk() const noexcept {
                 return { m_impl.data() + m_head, count() };
             }
 
-            void shrink() {
+            void shrink() noexcept {
                 if (m_head > 0 && m_tail > 0) {
                     // todo:: memmove for overlapping regions?
                     for (std::size_t i = 0; i < count(); ++i) {
@@ -64,28 +65,29 @@ namespace hope::io {
                 }
             }
 
-            void reset() {
+            void reset() noexcept {
                 m_head = 0;
                 m_tail = 0;
             }
 
-            bool is_empty() const {
+            bool is_empty() const noexcept {
                 return count() == 0;
             }
 
-            void handle_write(std::size_t bytes) {
+            void handle_write(std::size_t bytes) noexcept {
                 m_tail += bytes;
             }
 
-            void handle_read(std::size_t bytes) {
+            void handle_read(std::size_t bytes) noexcept {
                 m_head += bytes;
             }
 
-            std::size_t count() const { return m_tail - m_head; }
-            std::size_t free_space() const { return m_impl.size() - m_tail; }
+            std::size_t count() const noexcept { return m_tail - m_head; }
+            std::size_t free_space() const noexcept { return m_impl.size() - m_tail; }
+            const buffer_impl& get_buffer() const noexcept { return m_impl; }
 
         private:
-            std::array<unsigned char, 8096> m_impl;
+            buffer_impl m_impl;
             std::size_t m_tail = 0;
             std::size_t m_head = 0;
         };
