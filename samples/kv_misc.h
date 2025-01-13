@@ -23,7 +23,7 @@
 #include "hope-io/proto/message.h"
 
 struct event_loop_stream_wrapper final : public hope::io::stream {
-    static auto get(hope::io::event_loop::buffer& in_buffer) {
+    static auto get(hope::io::event_loop::connection& in_connection) {
         const auto buffer = in_connection.buffer->get_buffer();
         auto* Self = (uint64_t*)((char*)buffer.data() + buffer.size() - sizeof(void*));
         return (event_loop_stream_wrapper*)*Self;
@@ -65,7 +65,7 @@ struct event_loop_stream_wrapper final : public hope::io::stream {
     }
 
     virtual size_t read(void *data, std::size_t length) override {
-        connection.buffer->read(data, length);
+        return connection.buffer->read(data, length);
     }
 
     virtual std::string get_endpoint() const override { return {}; }
@@ -73,7 +73,7 @@ struct event_loop_stream_wrapper final : public hope::io::stream {
     virtual void set_options(const hope::io::stream_options&) override {}
     virtual void connect(std::string_view ip, std::size_t port) override {}
     virtual void disconnect() override {}
-    virtual size_t read_once(void* data, std::size_t length) override {}
+    virtual size_t read_once(void* data, std::size_t length) override { return 0u; }
     virtual void stream_in(std::string& buffer) override {}
 private:
     hope::io::event_loop::connection& connection;

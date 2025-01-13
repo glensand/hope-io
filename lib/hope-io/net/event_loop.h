@@ -21,7 +21,7 @@ namespace hope::io {
         // fixed size buffer, intended to be used for communication with application
         // it may looks like that:
         // | unsued spacer | payload | slack |                  
-        struct buffer final {
+        struct fixed_size_buffer final {
             using buffer_impl = std::array<unsigned char, 8096>;
             // tries to write specified amount of data to the buffer
             // returns count actually written
@@ -103,7 +103,7 @@ namespace hope::io {
             connection(int32_t in_descriptor)
                 : descriptor(in_descriptor) {}
                 
-            buffer* buffer = nullptr;
+            fixed_size_buffer* buffer = nullptr;
             const int32_t descriptor;
             
             auto get_state() const noexcept { return state; }

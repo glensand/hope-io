@@ -28,24 +28,24 @@ namespace hope::io {
         private:
 
             struct buffer_pool final {
-                buffer* allocate() {
-                    buffer* allocated = nullptr;
+                fixed_size_buffer* allocate() {
+                    fixed_size_buffer* allocated = nullptr;
                     if (!m_impl.empty()) {
                         allocated = m_impl.back();
                         m_impl.pop_back();
                     } else {
-                        allocated = new buffer;
+                        allocated = new fixed_size_buffer;
                     }
                     return allocated;
                 }
 
-                void redeem(buffer* b) {
+                void redeem(fixed_size_buffer* b) {
                     b->reset();
                     m_impl.emplace_back(b);
                 }
 
             private:
-                std::deque<buffer*> m_impl; // prepool?
+                std::deque<fixed_size_buffer*> m_impl; // prepool?
             };
             
             virtual void run(std::size_t port, callbacks&& cb) override {
@@ -153,10 +153,11 @@ namespace hope::io {
                                             cb.on_read(conn);
                                             conn.buffer->shrink();
                                             assert(conn.buffer->free_space() != 0);
-
+                                            assert(received > 0);
+                                            
                                             // if the application does not handle buffer, or we received less data
                                             // then we can obtain, will try at the next time
-                                            if (received < span.second || conn.get_state() != connection_state::read) {
+                                            if ((size_t)received < span.second || conn.get_state() != connection_state::read) {
                                                 read = false;
                                             }
                                         }
