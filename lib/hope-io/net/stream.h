@@ -65,19 +65,18 @@ namespace hope::io {
         }
     };
 
-    // TODO:: string_view
     template <>
     inline void stream::read<std::string>(std::string& val) {
-        if (const auto size = read<uint64_t>(); size > 0) {
-            auto* buffer = new char [size];
-            read(buffer, size);
-            val = std::string(buffer, size);
+        const auto size = read<uint16_t>();
+        if (size > 0) { 
+            val.resize(size);
+            read(val.data(), size);
         }
     }
 
     template <>
     inline void stream::write<std::string>(const std::string& val) {
-        write((uint64_t)val.size());
+        write((uint16_t)val.size());
         write(val.c_str(), val.size());
     }
 }

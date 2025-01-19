@@ -38,35 +38,40 @@ struct kv_service final {
                         const auto used_chunk = c.buffer->used_chunk();
                         const auto message_length = *(uint32_t*)(used_chunk.first);
                         if (message_length == used_chunk.second) {
-                            auto* stream = event_loop_stream_wrapper::get(c);
-                            stream->begin_read();
+                            event_loop_stream_wrapper stream(*c.buffer); 
+                            std::cout << "\n\n[";
+                            auto used_part = c.buffer->used_chunk();
+                            std::cout.write((char*)used_part.first, used_part.second);
+                            std::cout << "]\n\n";
+                            stream.begin_read();
                             auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
-                                hope::proto::argument_factory::serialize(*stream));
-                            stream->end_read();
-                            auto type = (message_type)proto_msg->field<hope::proto::int32>("type").get();
-                            auto&& key = proto_msg->field<hope::proto::string>("key").get();
-                            if (type == message_type::get) {
-                                const auto it = storage.find(key);
-                                get_response response{ key, nullptr };
-                                if (it != end(storage)) {
-                                    response.value = it->second.value;
-                                }
-                                stream->begin_write();
-                                response.write(*stream);
-                                stream->end_write();
-                                c.set_state(hope::io::event_loop::connection_state::write);
-                            } else if (type == message_type::set) {
-                                auto&& entry = storage[key];
-                                delete entry.value;
-                                entry.value = proto_msg->release("value");
-                                set_response response{ true };
-                                stream->begin_write();
-                                response.write(*stream);
-                                stream->end_write();
-                                c.set_state(hope::io::event_loop::connection_state::write);
-                            } else {
+                                hope::proto::argument_factory::serialize(stream));
+                            stream.end_read();
+                            // TODO:: ensure all data were consumed
+                            auto type = (message_type)proto_msg->field<int32_t>("type");
+                            if (type != message_type::get && type != message_type::set) {
                                 c.set_state(hope::io::event_loop::connection_state::die);
                                 assert(false);
+                            }
+                            else {
+                                auto&& key = proto_msg->field<std::string>("key");
+                                stream.begin_write();
+                                if (type == message_type::get) {
+                                    const auto it = storage.find(key);
+                                    get_response response{ key, nullptr };
+                                    if (it != end(storage)) {
+                                        response.value = it->second.value;
+                                    }
+                                    response.write(stream);
+                                } else {
+                                    auto&& entry = storage[key];
+                                    delete entry.value;
+                                    entry.value = proto_msg->release("value");
+                                    set_response response{ true };   
+                                    response.write(stream);
+                                }
+                                stream.end_write();
+                                c.set_state(hope::io::event_loop::connection_state::write);
                             }
                         }
                     }

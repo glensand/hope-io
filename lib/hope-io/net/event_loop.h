@@ -37,7 +37,7 @@ namespace hope::io {
             }
             
             std::size_t read(void* data, std::size_t size) noexcept {
-                if (count() > size) {
+                if (count() < size) {
                     size = count();
                 }
                 auto* begin = m_impl.data() + m_head;

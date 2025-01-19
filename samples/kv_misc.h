@@ -23,37 +23,25 @@
 #include "hope-io/proto/message.h"
 
 struct event_loop_stream_wrapper final : public hope::io::stream {
-    static auto get(hope::io::event_loop::connection& in_connection) {
-        const auto buffer = in_connection.buffer->get_buffer();
-        auto* Self = (uint64_t*)((char*)buffer.data() + buffer.size() - sizeof(void*));
-        return (event_loop_stream_wrapper*)*Self;
-    }
-
-    explicit event_loop_stream_wrapper(hope::io::event_loop::connection& in_connection)
-        : connection(in_connection) { 
-            // TODO:: check if we have enogh space
-            // here we will use a trick, write ptr to "me" at the end of buffer
-            // thus we'll not use additional mapping, just extract pointer
-            const auto buffer = connection.buffer->get_buffer();
-            auto* Self = (uint64_t*)((char*)buffer.data() + buffer.size() - sizeof(void*));
-            *Self = (uint64_t)this;
+    explicit event_loop_stream_wrapper(hope::io::event_loop::fixed_size_buffer& in_buffer)
+        : buffer(in_buffer) { 
         }
 
     void begin_write() {
-        connection.buffer->reset();
+        buffer.reset();
         // seek buffer to 4 bytes, for event-loop it is important to know count of bytes we'll receive at this stage
-        connection.buffer->handle_write(sizeof(uint32_t));
+        buffer.handle_write(sizeof(uint32_t));
     }
 
     void end_write() {
-        const auto used_chunk = connection.buffer->used_chunk();
+        const auto used_chunk = buffer.used_chunk();
         // write size before submit
         *(uint32_t*)used_chunk.first = used_chunk.second;
     }
 
     void begin_read() {
         // skip first 4 bytes, belongs to loop wrapper
-        connection.buffer->handle_write(sizeof(uint32_t));
+        buffer.handle_read(sizeof(uint32_t));
     }
 
     void end_read() {
@@ -61,11 +49,11 @@ struct event_loop_stream_wrapper final : public hope::io::stream {
     }
 
     virtual void write(const void *data, std::size_t length) override {
-        connection.buffer->write(data, length);
+        buffer.write(data, length);
     }
 
     virtual size_t read(void *data, std::size_t length) override {
-        return connection.buffer->read(data, length);
+        return buffer.read(data, length);
     }
 
     virtual std::string get_endpoint() const override { return {}; }
@@ -76,12 +64,14 @@ struct event_loop_stream_wrapper final : public hope::io::stream {
     virtual size_t read_once(void* data, std::size_t length) override { return 0u; }
     virtual void stream_in(std::string& buffer) override {}
 private:
-    hope::io::event_loop::connection& connection;
+    hope::io::event_loop::fixed_size_buffer& buffer;
 };
 
 enum class message_type : uint8_t {
     set = 0,
     get,
+    full_log_dump,
+    dump,
     count,
 };
 
@@ -109,11 +99,12 @@ struct set_request final {
 
     void write(hope::io::stream& stream) {
         auto proto_msg = std::unique_ptr<hope::proto::argument>(
-        hope::proto::struct_builder::create()
-            .add<hope::proto::string>("key", key)
-            .add<hope::proto::int32>("type", int32_t(message_type::set))
-            .add(value)
-            .get("message"));
+            hope::proto::struct_builder::create()
+                .add<hope::proto::string>("key", key)
+                .add<hope::proto::int32>("type", int32_t(message_type::set))
+                .add(value)
+                .get("message")
+        );
         proto_msg->write(stream);
     }
 
@@ -123,7 +114,7 @@ private:
 };
 
 struct get_response final {
-    explicit get_response(std::string in_key, hope::proto::argument* in_value) 
+    explicit get_response(std::string in_key = {}, hope::proto::argument* in_value = {}) 
         : key(std::move(in_key))
         , value(in_value) { }
 
@@ -134,6 +125,13 @@ struct get_response final {
             .add(value)
             .get("message"));
         proto_msg->write(stream);
+    }
+
+    void read(hope::io::stream& stream) {
+        auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
+            hope::proto::argument_factory::serialize(stream));
+        value = proto_msg->release("value");
+        key = proto_msg->field<hope::proto::string>("key").get();
     }
 
     std::string key;

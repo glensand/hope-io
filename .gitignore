@@ -35,7 +35,6 @@ cmake-build-release/
 Build/
 build/
 *.DS_Store
-.vscode/
 .vs/
 .idea/
 
