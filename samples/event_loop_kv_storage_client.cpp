@@ -39,9 +39,7 @@ int main() {
             buffer_wrapper.end_write();
             auto used_part = buffer.used_chunk();
             stream->write(used_part.first, used_part.second);
-            std::cout << "\n\n[";
-            std::cout.write((char*)used_part.first, used_part.second);
-            std::cout << "]\n\n";
+
             // read responce
             uint32_t stub;
             stream->read(stub);
@@ -66,6 +64,8 @@ int main() {
             get_response r;
             r.read(*stream);
             stream->disconnect();
+
+            std::cout << "read:" << i << r.value->as<int32_t>() << "\n";
         }
     }
     catch (const std::exception& ex) {

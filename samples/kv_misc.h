@@ -131,7 +131,7 @@ struct get_response final {
         auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
             hope::proto::argument_factory::serialize(stream));
         value = proto_msg->release("value");
-        key = proto_msg->field<hope::proto::string>("key").get();
+        key = proto_msg->field<std::string>("key");
     }
 
     std::string key;
@@ -151,6 +151,6 @@ struct set_response final {
     void read(hope::io::stream& stream) {
         auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
             hope::proto::argument_factory::serialize(stream));
-        bOk = proto_msg->field<hope::proto::int32>("OK").get() != 0;
+        bOk = proto_msg->field<int32_t>("OK") != 0;
     }
 };
