@@ -45,10 +45,14 @@ namespace hope::proto{
             auto it = std::remove_if(begin(values), end(values), 
                 [&](const auto* arg) { return arg->get_name() == name; });
             if (it != end(values)) {
-                values.erase(it);
                 res = *it;
+                values.erase(it);
             }
             return res;
+        }
+
+        void release(argument* in_argument) {
+            values.erase(std::remove(begin(values), end(values), in_argument));
         }
 
     private:

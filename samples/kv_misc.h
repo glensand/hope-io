@@ -119,12 +119,15 @@ struct get_response final {
         , value(in_value) { }
 
     void write(hope::io::stream& stream) {
-        auto proto_msg = std::unique_ptr<hope::proto::argument>(
-        hope::proto::struct_builder::create()
-            .add<hope::proto::string>("key", key)
-            .add(value)
-            .get("message"));
+        auto proto_msg = std::unique_ptr<hope::proto::argument_struct>(
+            hope::proto::struct_builder::create()
+                .add<hope::proto::string>("key", key)
+                .add(value)
+                .get("message")
+        );
         proto_msg->write(stream);
+        // NOTE:: hack
+        proto_msg->release(value);
     }
 
     void read(hope::io::stream& stream) {
