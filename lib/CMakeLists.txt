@@ -11,8 +11,6 @@ set( CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -O3 -fPIC" )
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out)
 
 file(GLOB CL_HEADERS
-    hope-io/proto/*.h
-    hope-io/proto2/*.h
     hope-io/net/*.h
     hope-io/net/win/*.h
     hope-io/net/nix/*.h
@@ -21,8 +19,6 @@ file(GLOB CL_HEADERS
 )
 
 file(GLOB CL_SOURCES
-    hope-io/proto/*.cpp
-    hope-io/proto2/*.cpp
     hope-io/net/*.cpp
     hope-io/net/win/*.cpp
     hope-io/net/nix/*.cpp

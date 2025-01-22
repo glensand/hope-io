@@ -8,13 +8,7 @@
 
 #pragma once
 
-#include "hope-io/proto/argument.h"
-#include "hope-io/proto/argument_container.h"
-#include "hope-io/proto/argument_file.h"
-#include "hope-io/proto/argument_struct.h"
-#include "hope-io/proto/argument_array.h"
-#include "hope-io/proto/argument_factory.h"
-#include "hope-io/proto/message.h"
+#include "hope-io/net/stream.h"
 
 struct message final {
     std::string name;
@@ -22,18 +16,12 @@ struct message final {
 
     // todo:: make it more clear
     void send(hope::io::stream& stream) {
-        auto proto_msg = std::unique_ptr<hope::proto::argument>(
-        hope::proto::struct_builder::create()
-            .add<hope::proto::string>("name", name)
-            .add<hope::proto::string>("text", text)
-            .get("message"));
-        proto_msg->write(stream);
+        stream.write(name);
+        stream.write(text);
     }
 
     void recv(hope::io::stream& stream) {
-        auto proto_msg = std::unique_ptr<hope::proto::argument_struct>((hope::proto::argument_struct*)
-                hope::proto::argument_factory::serialize(stream));
-        name = proto_msg->field<std::string>("name");
-        text = proto_msg->field<std::string>("text");
+        stream.read(name);
+        stream.read(text);
     }
 };
