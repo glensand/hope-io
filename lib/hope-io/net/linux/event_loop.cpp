@@ -62,7 +62,8 @@ namespace hope::io {
 
                 while (m_running.load(std::memory_order_acquire)) {
                     poll_args.clear();
-                    poll_args.emplace_back(acceptor->raw(), POLLIN, 0);
+                    pollfd descriptor{ (int)acceptor->raw(), POLLIN, 0 };
+                    poll_args.emplace_back(descriptor);
 
                     // fill active connections
                     for (auto&& it = begin(connections); it != end(connections);) {
