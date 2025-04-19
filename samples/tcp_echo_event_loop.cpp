@@ -12,15 +12,18 @@
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/factory.h"
 #include "hope-io/net/init.h"
+#include "hope-io/coredefs.h"
 
 #include <iostream>
 #include <utility>
 
 void on_connect(hope::io::event_loop::connection& c) {
+    NAMED_SCOPE(OnConnect);
     c.set_state(hope::io::event_loop::connection_state::read);
 }
 
 void on_read(hope::io::event_loop::connection& c) {
+    NAMED_SCOPE(OnRead);
     const auto local_data = c.buffer->used_chunk();
     const auto message_length = local_data.second;
     if (message_length >= sizeof(uint32_t)) {
@@ -42,14 +45,18 @@ void on_read(hope::io::event_loop::connection& c) {
 }
 
 void on_write(hope::io::event_loop::connection& c) {
+    NAMED_SCOPE(OnWrite);
     c.set_state(hope::io::event_loop::connection_state::read);
 }
 
 void on_err(hope::io::event_loop::connection& c, const std::string& what) {
+    NAMED_SCOPE(OnError);
     std::cout << "Err occured:" << what << "\n";
 }
 
 int main() {
+    EASY_PROFILER_ENABLE;
+    profiler::startListen();
     try {
         hope::io::init();
         auto* loop = hope::io::create_event_loop();

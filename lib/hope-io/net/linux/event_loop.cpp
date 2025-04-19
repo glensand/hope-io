@@ -2,6 +2,7 @@
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"
+#include "hope-io/coredefs.h"
 
 #include <deque>
 #include <unordered_set>
@@ -49,6 +50,7 @@ namespace hope::io {
             };
             
             virtual void run(std::size_t port, callbacks&& cb) override {
+                THREAD_SCOPE(Event_Loop_Thread);
                 // TODO:: multiport option?
                 auto acceptor = create_acceptor();
                 acceptor->open(port);
@@ -61,6 +63,7 @@ namespace hope::io {
                 std::vector<struct pollfd> poll_args;
 
                 while (m_running.load(std::memory_order_acquire)) {
+                    NAMED_SCOPE(Loop);
                     poll_args.clear();
                     pollfd descriptor{ (int)acceptor->raw(), POLLIN, 0 };
                     poll_args.emplace_back(descriptor);
@@ -91,7 +94,7 @@ namespace hope::io {
                             ++it;
                         }
                     }
-                    int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), -1);
+                    int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), 1000);
                     if (rv < 0 && errno != EINTR) {
                         // Ok here we have error
                         // since run() can be executed from worker thread, we will not thtow exception here
@@ -101,6 +104,7 @@ namespace hope::io {
                         m_running = false;
                     } else if (rv > 0){
                         if (poll_args[0].revents) {
+                            NAMED_SCOPE(Accept);
                             struct sockaddr_in client_addr = {};
                             socklen_t socklen = sizeof(client_addr);
                             // TODO:: do it in loop?
