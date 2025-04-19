@@ -15,6 +15,9 @@
 
 #include <iostream>
 #include <utility>
+#include <thread>
+
+#include "easy/profiler.h"
 
 void on_connect(hope::io::event_loop::connection& c) {
     c.set_state(hope::io::event_loop::connection_state::read);
@@ -31,8 +34,6 @@ void on_read(hope::io::event_loop::connection& c) {
         if (string_length == message_length - sizeof(uint32_t)) {
             const char* p_text = ((char*)local_data.first + sizeof(uint32_t));
             std::string_view text(p_text, string_length);
-            std::cout << "Got message:" << text << "\n";
-
             c.buffer->reset();
             // set buffer pointer to read pos to echo msg
             c.buffer->handle_write(local_data.second);
@@ -49,18 +50,20 @@ void on_err(hope::io::event_loop::connection& c, const std::string& what) {
     std::cout << "Err occured:" << what << "\n";
 }
 
+std::thread worker;
+
 int main() {
+    EASY_PROFILER_ENABLE;
+    hope::io::init();
+    auto* loop = hope::io::create_event_loop();
     try {
-        hope::io::init();
-        auto* loop = hope::io::create_event_loop();
-        
         hope::io::event_loop::callbacks cb{
             [](auto& c) {
                 on_connect(c);
             },
             [](auto& c) {
                 on_read(c);
-            },
+            },\
             [](auto& c) {
                 on_write(c);
             },
@@ -69,9 +72,18 @@ int main() {
             },
         };
 
-        loop->run(1338, std::move(cb));
+        hope::io::event_loop::config cfg;
+        cfg.port = 1338;
+        worker = std::thread([=]() mutable {
+            loop->run(cfg, std::move(cb));
+        });
     } catch(const std::exception& e) {
         std::cout << e.what();
     }
+    int stub;
+    std::cin >> stub;
+    loop->stop();
+    worker.join();
+    profiler::dumpBlocksToFile("service.prof");
     return 0;
 }
