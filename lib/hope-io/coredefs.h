@@ -25,3 +25,17 @@
 #elif defined(_MSC_VER)
 #define WEBSOCK_ENABLE 1
 #endif
+
+// TODO:: move to cmake variable
+#define BUILD_WITH_EASY_PROFILER
+
+#ifdef BUILD_WITH_EASY_PROFILER
+#include <easy/profiler.h>
+#define __STR__(s) #s
+#define THREAD_SCOPE(ThreadName) EASY_THREAD_SCOPE(__STR__(ThreadName))
+#define NAMED_SCOPE(Name) EASY_BLOCK(__STR__(Name))
+#else
+#define __STR__(s)
+#define THREAD_SCOPE(ThreadName)
+#define NAMED_SCOPE(Name)
+#endif

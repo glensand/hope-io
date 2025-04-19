@@ -2,6 +2,7 @@
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"
+#include "hope-io/coredefs.h"
 
 #include <deque>
 #include <unordered_set>
@@ -56,7 +57,7 @@ namespace hope::io {
             private:
                 std::deque<fixed_size_buffer*> m_impl; // prepool?
             };
-            
+
             virtual void run(const config& cfg, callbacks&& cb) override {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
                 NAMED_SCOPE(Process);

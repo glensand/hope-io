@@ -16,7 +16,7 @@ foreach(source ${SAMPLE_CORE_SOURCES})
 
     target_include_directories(${target_name} PUBLIC ../../lib)
     target_include_directories(${target_name} PUBLIC ../third-party/easy_profiler/easy_profiler_core/include)
-
+    
     target_link_libraries(${target_name} PRIVATE hope-io)
     target_link_libraries(${target_name} PRIVATE easy_profiler)
 endforeach()
