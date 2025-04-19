@@ -141,9 +141,15 @@ namespace hope::io {
             on_error_t on_err = [] (connection&, const std::string&){ assert(false); };
         };
 
+        struct config final {
+            std::size_t max_connections = 128;
+            std::size_t max_accepts_per_tick = 128;
+            std::size_t port = 9393;
+        };
+
         virtual ~event_loop() = default;
         // TODO:: do we need to split acceptor, stream and loop options?
-        virtual void run(std::size_t port, callbacks&& cb) = 0;
+        virtual void run(const config& cfg, callbacks&& cb) = 0;
         virtual void stop() = 0;
     };
 
