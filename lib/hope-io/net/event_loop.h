@@ -142,7 +142,7 @@ namespace hope::io {
         };
 
         struct config final {
-            std::size_t max_connections = 128;
+            std::size_t max_mutual_connections = 1024;
             std::size_t max_accepts_per_tick = 128;
             std::size_t port = 9393;
         };

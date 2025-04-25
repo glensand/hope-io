@@ -18,8 +18,6 @@
 #include <utility>
 #include <thread>
 
-#include "easy/profiler.h"
-
 void on_connect(hope::io::event_loop::connection& c) {
     NAMED_SCOPE(OnConnect);
     c.set_state(hope::io::event_loop::connection_state::read);

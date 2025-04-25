@@ -16,13 +16,6 @@
 #include <netinet/ip.h>
 #include <iostream>
 
-#define BUILD_WITH_EASY_PROFILER 1
-#include "easy/profiler.h"
-
-#define __STR__(s) #s
-#define THREAD_SCOPE(ThreadName) EASY_THREAD_SCOPE(__STR__(ThreadName));
-#define NAMED_SCOPE(Name) EASY_BLOCK(__STR__(Name))
-
 namespace hope::io { 
 
     event_loop* create_event_loop() {
@@ -60,7 +53,7 @@ namespace hope::io {
 
             virtual void run(const config& cfg, callbacks&& cb) override {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
-                NAMED_SCOPE(Process);
+                //NAMED_SCOPE(Process);
                 // TODO:: multiport option?
                 m_acceptor = create_acceptor();
                 m_acceptor->open(cfg.port);
@@ -160,7 +153,6 @@ namespace hope::io {
                     NAMED_SCOPE(AcceptOne);
                     struct sockaddr_in client_addr = {};
                     socklen_t socklen = sizeof(client_addr);
-                    // TODO:: do it in loop?
                     int sock = accept(m_acceptor->raw(), (struct sockaddr *)&client_addr, &socklen);
                     int flags = fcntl(sock, F_GETFL, 0);
                     if (flags == -1) {
