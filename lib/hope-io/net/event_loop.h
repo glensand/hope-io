@@ -100,17 +100,20 @@ namespace hope::io {
         };
 
         struct connection final {
-            connection(int32_t in_descriptor)
-                : descriptor(in_descriptor) {}
+            static std::function<void(const connection& conn)> on_state_changed;
+            connection() = default;
                 
             fixed_size_buffer* buffer = nullptr;
-            const int32_t descriptor;
+            int32_t descriptor = -1;
             
             auto get_state() const noexcept { return state; }
             void set_state(connection_state new_state) noexcept {
                 assert(new_state != state);
                 // check if switch from read or write buffer has to be empty
                 state = new_state;
+                if (on_state_changed) {
+                    on_state_changed(*this);
+                }
             }
             bool operator==(const connection& rhs) const {
                 return descriptor == rhs.descriptor;
@@ -145,6 +148,7 @@ namespace hope::io {
             std::size_t max_mutual_connections = 1024;
             std::size_t max_accepts_per_tick = 128;
             std::size_t port = 9393;
+            int epoll_temeout = 1000;
         };
 
         virtual ~event_loop() = default;
