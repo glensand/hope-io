@@ -43,5 +43,4 @@ else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
 endif ()
 
-target_include_directories(hope-io PUBLIC ../lib)
-
+target_include_directories(${PROJECT_NAME} PUBLIC ../lib)

@@ -28,5 +28,6 @@ namespace hope::io {
 
     // server loop
     class event_loop* create_event_loop();
+    class event_loop* create_event_loop2(std::size_t max_concurrent_connections);
 
 }
