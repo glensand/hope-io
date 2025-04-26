@@ -44,4 +44,3 @@ else ()
 endif ()
 
 target_include_directories(${PROJECT_NAME} PUBLIC ../lib)
-target_include_directories(${PROJECT_NAME} PUBLIC ../third_party/easy_profiler/easy_profiler_core/include)

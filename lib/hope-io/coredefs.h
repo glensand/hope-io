@@ -27,7 +27,7 @@
 #endif
 
 // TODO:: move to cmake variable
-#define BUILD_WITH_EASY_PROFILER
+//#define BUILD_WITH_EASY_PROFILER
 
 #ifdef BUILD_WITH_EASY_PROFILER
 #include <easy/profiler.h>

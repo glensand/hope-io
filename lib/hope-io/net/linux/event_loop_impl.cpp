@@ -5,7 +5,6 @@
 #include "hope-io/coredefs.h"
 
 #include <deque>
-#include <unordered_set>
 #include <atomic>
 
 #include <fcntl.h>
@@ -14,13 +13,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
-#include <iostream>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/epoll.h>
 #include <errno.h>
 #include <stdio.h>
@@ -43,6 +38,7 @@ namespace hope::io {
                         remove_connection(conn.descriptor);
                     } else if (conn.get_state() == connection_state::read) {
                         ev.events |= EPOLLIN;
+                        // TODO:: use user space to control events?
                         epoll_ctl(m_epfd, EPOLL_CTL_MOD, conn.descriptor, &ev);
                     }
                     else if (conn.get_state() == connection_state::write) {
