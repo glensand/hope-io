@@ -43,4 +43,15 @@ else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
 endif ()
 
+if(UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
+if(LINUX) 
+    message(STATUS ">>> Linux")
+    add_definitions(-DPLATFORM_LINUX)
+else()
+    message(STATUS ">>> Apple or Win")
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC ../lib)

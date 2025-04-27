@@ -102,7 +102,9 @@ namespace hope::io {
         struct connection final {
             static std::function<void(const connection& conn)> on_state_changed;
             connection() = default;
-                
+            connection(int32_t in_descriptor) {
+                descriptor = in_descriptor;
+            }
             fixed_size_buffer* buffer = nullptr;
             int32_t descriptor = -1;
             
