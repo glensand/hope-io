@@ -8,7 +8,7 @@
 
 #include "hope-io/coredefs.h"
 
-#ifdef ICARUS_WIN
+#if PLATFORM_WINDOWS
 
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/acceptor.h"
@@ -116,7 +116,7 @@ namespace hope::io {
     event_loop* create_event_loop2(std::size_t max_concurrent_connections) {
         return nullptr;
     }
-    
+
 }
 
 #endif

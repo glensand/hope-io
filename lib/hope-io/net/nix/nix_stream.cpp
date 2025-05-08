@@ -8,7 +8,7 @@
 
 #include "hope-io/coredefs.h"
 
-#ifdef ICARUS_NIX
+#if PLATFORM_LINUX || PLATFORM_APPLE
 
 #include <stdexcept>
 

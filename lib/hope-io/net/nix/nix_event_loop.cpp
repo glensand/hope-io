@@ -8,7 +8,7 @@
 
 #include "hope-io/coredefs.h"
 
-#if defined(ICARUS_NIX) && !defined(PLATFORM_LINUX)
+#if PLATFORM_APPLE
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"

@@ -8,7 +8,7 @@
 
 #include "hope-io/coredefs.h"
 
-#ifdef ICARUS_NIX
+#if PLATFORM_LINUX || PLATFORM_APPLE
 
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"

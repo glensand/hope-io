@@ -8,7 +8,7 @@
 
 #include "hope-io/coredefs.h"
 
-#ifdef ICARUS_WIN
+#if PLATFORM_WINDOWS
 
 #define WIN32_LEAN_AND_MEAN
 

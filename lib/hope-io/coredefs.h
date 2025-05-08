@@ -8,12 +8,6 @@
 
 #pragma once
 
-#if defined(_WIN32) || defined(_WIN64)
-#define ICARUS_WIN
-#else
-#define ICARUS_NIX
-#endif
-
 #if defined(__clang__)
 #define WEBSOCK_ENABLE 1
 #elif defined(__GNUC__) || defined(__GNUG__)

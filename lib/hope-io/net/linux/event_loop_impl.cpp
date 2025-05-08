@@ -1,4 +1,4 @@
-#ifdef PLATFORM_LINUX
+#if PLATFORM_LINUX
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"

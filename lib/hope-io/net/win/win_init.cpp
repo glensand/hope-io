@@ -7,7 +7,7 @@
  */
 
 #include "hope-io/coredefs.h"
-#ifdef ICARUS_WIN
+#if PLATFORM_WINDOWS
 
 #include "hope-io/net/init.h"
 
