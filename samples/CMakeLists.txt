@@ -15,10 +15,10 @@ foreach(source ${SAMPLE_CORE_SOURCES})
     add_executable(${target_name} ${filename})
 
     target_include_directories(${target_name} PUBLIC ../../lib)
-    target_include_directories(${target_name} PUBLIC ../third-party/easy_profiler/easy_profiler_core/include)
+    #target_include_directories(${target_name} PUBLIC ../third-party/easy_profiler/easy_profiler_core/include)
     
     target_link_libraries(${target_name} PRIVATE hope-io)
-    target_link_libraries(${target_name} PRIVATE easy_profiler)
+    #target_link_libraries(${target_name} PRIVATE easy_profiler)
 endforeach()
 
 # Example frontend dir for http_server.cpp sample

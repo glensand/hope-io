@@ -6,6 +6,10 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
+ #include "hope-io/coredefs.h"
+
+ #ifdef ICARUS_NIX
+
 #include "message.h"
 
 #include "hope-io/net/stream.h"
@@ -66,3 +70,8 @@ int main(int argc, char *argv[]) {
     do_client_stuff(false);
     return 0;
 }
+#else 
+int main() {
+    return -1;
+}
+#endif

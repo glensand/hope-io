@@ -108,7 +108,7 @@ namespace hope::io {
 
 namespace hope::io {
 
-    acceptor* create_tls_acceptor(std::string_view key, std::string_view cert) {
+    acceptor* create_tls_acceptor(std::string_view, std::string_view) {
         assert(false && "hope-io/ OpenSSL is not available");
         return nullptr;
     }

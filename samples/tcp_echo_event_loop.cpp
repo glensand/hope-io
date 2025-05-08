@@ -56,10 +56,10 @@ void on_err(hope::io::event_loop::connection& c, const std::string& what) {
 std::thread worker;
 
 int main() {
-    EASY_PROFILER_ENABLE;
+    PROFILER_INIT
     hope::io::init();
     auto* loop = hope::io::create_event_loop();
-    profiler::startListen();
+    PROFILER_START_LISTEN
     try {
         hope::io::event_loop::callbacks cb{
             [](auto& c) {

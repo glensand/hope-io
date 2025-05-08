@@ -34,8 +34,12 @@
 #define __STR__(s) #s
 #define THREAD_SCOPE(ThreadName) EASY_THREAD_SCOPE(__STR__(ThreadName))
 #define NAMED_SCOPE(Name) EASY_BLOCK(__STR__(Name))
+#define PROFILER_INIT EASY_PROFILER_ENABLE
+#define PROFILER_START_LISTEN profiler::startListen();
 #else
 #define __STR__(s)
 #define THREAD_SCOPE(ThreadName)
 #define NAMED_SCOPE(Name)
+#define PROFILER_INIT
+#define PROFILER_START_LISTEN
 #endif

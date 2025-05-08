@@ -56,7 +56,7 @@ namespace {
             return (int32_t)m_socket;
         }
 
-        virtual void set_options(const options& options) override {
+        virtual void set_options(const hope::io::stream_options& options) override {
             if (m_socket != INVALID_SOCKET)
                 throw_error("hope-io/win_stream: cannot set options when the socket is connected:", WSAGetLastError());
             m_options = options;
@@ -188,7 +188,7 @@ namespace {
         }
 
         SOCKET m_socket{ INVALID_SOCKET };
-        options m_options;
+        hope::io::stream_options m_options;
     };
 
 }

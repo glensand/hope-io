@@ -10,6 +10,7 @@
 
 #ifdef ICARUS_WIN
 
+#include "hope-io/net/event_loop.h"
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"
@@ -28,6 +29,10 @@
 #include <atomic>
 
 #pragma comment (lib, "Ws2_32.lib")
+
+namespace hope::io {
+    std::function<void(const event_loop::connection& conn)> event_loop::connection::on_state_changed;
+}
 
 namespace {
 
@@ -85,6 +90,14 @@ namespace {
             return hope::io::create_stream(new_socket);
         }
 
+        virtual long long raw() const override {
+            return m_listen_socket;
+        }
+
+        virtual void set_options(const struct hope::io::stream_options&) override {
+            // TODO:: implement
+        }
+
         SOCKET m_listen_socket{ INVALID_SOCKET };
     };
 
@@ -96,6 +109,14 @@ namespace hope::io {
         return new win_acceptor();
     }
 
+    event_loop* create_event_loop() {
+        return nullptr;
+    }
+
+    event_loop* create_event_loop2(std::size_t max_concurrent_connections) {
+        return nullptr;
+    }
+    
 }
 
 #endif

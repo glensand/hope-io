@@ -12,6 +12,7 @@
 #include <string>
 #include <cassert>
 #include <utility>
+#include <array>
 
 namespace hope::io {
 
@@ -92,7 +93,7 @@ namespace hope::io {
             std::size_t m_head = 0;
         };
 
-        enum class connection_state : u_int8_t {
+        enum class connection_state : int8_t {
             idle,
             read,
             write,
