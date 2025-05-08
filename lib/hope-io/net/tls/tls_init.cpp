@@ -18,18 +18,18 @@
 
 namespace hope::io {
 
-    static std::mutex guard;
-    static int initialized = 0;
+    static std::mutex tls_guard;
+    static int tls_initialized = 0;
     
     void init_tls() {
 #ifdef HOPE_IO_USE_OPENSSL
-        std::lock_guard lock(guard);
-        if (initialized == 0){
+        std::lock_guard lock(tls_guard);
+        if (tls_initialized == 0){
             SSL_library_init();
 	        SSL_load_error_strings();
 	        OpenSSL_add_all_algorithms();
         }
-        ++initialized;
+        ++tls_initialized;
 #else
         assert(false && "hope-io/ OpenSSL is not available");
 #endif
@@ -37,9 +37,9 @@ namespace hope::io {
 
     void deinit_tls() {
 #ifdef HOPE_IO_USE_OPENSSL
-        std::lock_guard lock(guard);
-        --initialized;
-        if (initialized == 0){
+        std::lock_guard lock(tls_guard);
+        --tls_initialized;
+        if (tls_initialized == 0){
             ERR_free_strings();
 	        EVP_cleanup();
         }
