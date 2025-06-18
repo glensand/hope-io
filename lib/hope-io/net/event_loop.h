@@ -23,7 +23,8 @@ namespace hope::io {
         // it may looks like that:
         // | unsued spacer | payload | slack |                  
         struct fixed_size_buffer final {
-            using buffer_impl = std::array<unsigned char, 512 * 1024>;
+            constexpr static auto buffer_size = 512 * 1024; // 512 KB
+            using buffer_impl = std::array<unsigned char, buffer_size>;
             // tries to write specified amount of data to the buffer
             // returns count actually written
             std::size_t write(const void* data, std::size_t size) noexcept {
