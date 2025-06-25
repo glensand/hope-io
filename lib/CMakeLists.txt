@@ -39,6 +39,8 @@ if (OPENSSL_FOUND)
     include_directories(${OPENSSL_INCLUDE_DIR})
 
     target_link_libraries(${PROJECT_NAME} ${OPENSSL_LIBRARIES})
+    message(${OPENSSL_LIBRARIES})
+    message(${OPENSSL_INCLUDE_DIR})
 else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
 endif ()
