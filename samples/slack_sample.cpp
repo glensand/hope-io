@@ -37,8 +37,12 @@ std::string extract_json_string(const std::string& json, const std::string& key)
     return value;
 }
 
+#include <string>
+#include <vector>
+#include <sstream>
+
 int main() {
-    const std::string token = "xoxb-";
+    const std::string token = "";
     const std::string chat_id = "";
 
     hope::io::init_tls();;
@@ -77,6 +81,7 @@ int main() {
         std::cout << upload_url << std::endl;
         std::cout << file_id << std::endl;
 
+        auto url = hope::io::http::extract_url(upload_url);
         auto res = hope::io::http::upload_file(upload_url, file_content, "hope_stack.txt");
         std::cout << res << std::endl;
     }

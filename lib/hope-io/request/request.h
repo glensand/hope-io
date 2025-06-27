@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <utility>
 #include <format>
+#include <sstream>
 
 namespace hope::io::http {
 
@@ -127,9 +128,41 @@ namespace hope::io::http {
         return buffer;
     }
 
+    inline std::string build_http_request(
+        const std::string& path,           
+        const std::string& host,
+        const std::string& filename,
+        const std::string_view& bin)
+    {
+        const std::string boundary = "----MyBoundary7d7b3d"; // can be more random
+        std::ostringstream bodyStream;
+
+        // Add file part
+        bodyStream << "--" << boundary << "\r\n";
+        bodyStream << "Content-Disposition: form-data; name=\"file\"; filename=\"" << filename << "\"\r\n";
+        bodyStream << "Content-Type: application/octet-stream\r\n\r\n";
+        bodyStream.write(reinterpret_cast<const char*>(bin.data()), bin.size());
+        bodyStream << "\r\n";
+
+        // End of multipart
+        bodyStream << "--" << boundary << "--\r\n";
+
+        std::string body = bodyStream.str();
+
+        // Build request
+        std::ostringstream request;
+        request << "POST " << path << " HTTP/1.1\r\n";
+        request << "Host: " << host << "\r\n";
+        request << "Content-Type: multipart/form-data; boundary=" << boundary << "\r\n";
+        request << "Content-Length: " << body.size() << "\r\n";
+        request << "Connection: close\r\n\r\n";
+        request << body;
+
+        return request.str(); // ready to be sent over socket
+    }
+
     inline std::string upload_file(const std::string& endpoint, std::string_view payload,
-        const std::string file_name,
-        const std::string& header_data = {}) {
+        const std::string file_name) {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
@@ -137,31 +170,10 @@ namespace hope::io::http {
         } else {
             stream = hope::io::create_tls_stream();
         }
-
-        const std::string boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-        const auto body_begin = std::format(
-            "--{}\r\n"
-            "Content-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\n"
-            "Content-Type: text/plain\r\n\r\n",
-            boundary,
-            file_name);
-        const auto body_end = std::format("\r\n--{}--\r\n", boundary);
-        const auto body_size = body_begin.size() + payload.size() + body_end.size();
-        const auto request_begin = std::format("POST {} HTTP/1.1\r\n"
-                                             "Host: {}\r\n"
-                                             "User-Agent: RawUploader/1.0\r\n"
-                                             "Content-Type: multipart/form-data; boundary={}\r\n"
-                                             "Content-Length: {}\r\n"
-                                             "Connection: close\r\n",
-                                             url.path,
-                                             url.hostname,
-                                             boundary,
-                                             body_size);
+        auto req = build_http_request(url.path, url.hostname, file_name, payload);
         stream->connect(url.hostname, url.port);
-        stream->write(request_begin.data(), request_begin.size());
-        stream->write(body_begin.data(), body_begin.size());
-        stream->write(payload.data(), payload.size());
-        stream->write(body_end.data(), body_end.size());
+        stream->write(req.data(), req.size());
+   
         std::string buffer;
         stream->stream_in(buffer);
         stream->disconnect();
