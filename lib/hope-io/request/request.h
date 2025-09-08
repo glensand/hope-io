@@ -16,7 +16,6 @@
 #include <regex>
 #include <stdexcept>
 #include <utility>
-#include <format>
 #include <sstream>
 
 namespace hope::io::http {

@@ -11,7 +11,6 @@
 #if WEBSOCK_ENABLE
 
 #include <cassert>
-#include <format>
 
 #include "websockets.h"
 #include "hope-io/net/stream.h"
@@ -77,24 +76,40 @@ namespace {
 }
 
 namespace hope::io::websockets {
+    std::string build_request(
+        const std::string& uri,
+        const std::string& web_version,
+        const std::string& host,
+        const std::string& generated_key,
+        const std::string& socket_version)
+    {
+        std::string request;
+
+        request.reserve(256); // optional, avoids reallocations
+
+        request += "GET ";
+        request += uri;
+        request += " ";
+        request += web_version;
+        request += "\r\nHost: ";
+        request += host;
+        request += "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ";
+        request += generated_key;
+        request += "\r\nSec-WebSocket-Version: ";
+        request += socket_version;
+        request += "\r\n\r\n";
+
+        return request;
+    }
+
 	std::string generate_handshake(const std::string& host, const std::string& uri) {
         constexpr auto web_version = "HTTP/1.1";
         constexpr auto socket_version = "13";
 
         constexpr auto key_length = 0x10;
 
-        constexpr auto request_format =
-            "GET {} {}\r\n"
-            "Host: {}\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Key: {}\r\n"
-            "Sec-WebSocket-Version: {}\r\n"
-            "\r\n";
-
         const auto generated_key = base64_key_encode(key_length);
-
-        return std::format(request_format, uri, web_version, host, generated_key, socket_version);
+        return build_request(uri, web_version, host, generated_key, socket_version);
 	}
 
     bool validate_handshake_response(const void* data, std::size_t length) {
