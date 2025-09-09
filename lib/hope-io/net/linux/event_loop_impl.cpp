@@ -80,14 +80,17 @@ namespace hope::io {
             virtual void run(const config& cfg, callbacks&& cb) override {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
                 m_listen_socket = socket(AF_INET, SOCK_STREAM, 0);
-
+                if (m_listen_socket == -1) {
+                    throw std::runtime_error(std::string("Cannot create socker") + strerror(errno));
+                }
                 sockaddr_in srv_addr;
                 bzero((char *)&srv_addr, sizeof(struct sockaddr_in));
                 srv_addr.sin_family = AF_INET;
                 srv_addr.sin_addr.s_addr = INADDR_ANY;
                 srv_addr.sin_port = htons(cfg.port);
-                bind(m_listen_socket, (struct sockaddr *)&srv_addr, sizeof(srv_addr));
-            
+                if (-1 == bind(m_listen_socket, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
+                    throw_bind_err();
+                }
                 auto flags = fcntl(m_listen_socket, F_GETFL, 0);
                 fcntl(m_listen_socket, F_SETFL, flags | O_NONBLOCK);
                 listen(m_listen_socket, cfg.max_mutual_connections);
@@ -121,6 +124,7 @@ namespace hope::io {
                         }
                     }
                 }
+                close(m_listen_socket);
             }
 
             virtual void stop() override {
@@ -230,6 +234,18 @@ namespace hope::io {
                 assert(m_connections[fd].buffer == nullptr);
                 m_connections[fd].descriptor = fd;
                 m_connections[fd].buffer = m_pl.allocate();
+            }
+
+            void throw_bind_err() {
+                switch (errno) {
+                    case EACCES: throw std::runtime_error("Permission denied (need root for ports < 1024)");
+                    case EADDRINUSE: throw std::runtime_error("Address already in use (another process bound to this port).");
+                    case EADDRNOTAVAIL: throw std::runtime_error("Invalid address (not assigned to this machine).");
+                    case EBADF: throw std::runtime_error("Invalid socket descriptor");
+                    case EINVAL: throw std::runtime_error("Socket already bound, or bad parameters.");
+                    case ENOTSOCK: throw std::runtime_error("File descriptor is not a socket.");
+                    default: std::runtime_error("Unknown bind error.");
+                }
             }
 
             std::vector<epoll_event> m_events;
