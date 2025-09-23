@@ -10,8 +10,7 @@
 
 #include "hope-io/net/factory.h"
 #include "hope-io/net/stream.h"
-#include <cstddef>
-#include <string>
+#include <format>
 #include <string>
 #include <regex>
 #include <stdexcept>
