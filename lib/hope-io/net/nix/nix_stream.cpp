@@ -77,7 +77,7 @@ namespace {
 
         virtual void disconnect() override {
             close(m_socket);
-            m_socket = 0;
+            m_socket = -1;
         }
 
         virtual void write(const void* data, std::size_t length) override {
@@ -114,7 +114,7 @@ namespace {
         }
 
         virtual void set_options(const hope::io::stream_options& opt) override {
-            assert(m_socket != 0);
+            assert(m_socket != -1);
             struct timeval timeout;
             timeout.tv_sec = opt.write_timeout / 1000;
             timeout.tv_usec = 1000 * (opt.write_timeout - timeout.tv_sec * 1000);
@@ -143,7 +143,7 @@ namespace {
             }
         }
 
-        int m_socket{ 0 };
+        int m_socket{ -1 };
     };
 
 }
