@@ -82,11 +82,17 @@ int main() {
     std::cout << resp;
 
     const std::string file_content = "Extra long file with meaningfull text";
+    const auto file_name = "hope_stack.txt";
+    std::ofstream out(file_name);
+    for (auto line = 0; line < 10000; ++line) {
+        out << file_content;
+    }
+    out.close();
     // post file
     // simple message
     const char *external_file_host = "https://slack.com/api/files.getUploadURLExternal";
     resp = hope::io::http::get(external_file_host,
-                               {{"filename", "hope_stack.txt"}, {"length", std::to_string(file_content.size())}},
+                               {{"filename", file_name}, {"length", std::to_string(std::filesystem::file_size(file_name))}},
                                auth_header
     );
 
@@ -99,7 +105,7 @@ int main() {
     std::cout << file_id << std::endl;
 
     auto url = hope::io::http::extract_url(upload_url);
-    auto res = hope::io::http::upload_file(upload_url, file_content, "hope_stack.txt");
+    auto res = hope::io::http::upload_file_2(upload_url, file_name, file_name);
     std::cout << res << std::endl;
 
     const auto complete_upload_host = "https://slack.com/api/files.completeUploadExternal";

@@ -8,9 +8,12 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include "hope-io/net/factory.h"
 #include "hope-io/net/stream.h"
 #include <format>
+#include <fstream>
 #include <string>
 #include <regex>
 #include <stdexcept>
@@ -240,7 +243,7 @@ namespace hope::io::http {
             char buffer[buffer_size];
             while (read_size < file_size) {
                 in.read(buffer, buffer_size);
-                const auto current_read = in.gcount() - read_size;
+                const auto current_read = in.gcount();
                 stream->write(buffer, current_read);
                 read_size += current_read;
             }

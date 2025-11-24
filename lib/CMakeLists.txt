@@ -36,6 +36,7 @@ if (OPENSSL_FOUND)
 
     add_definitions(-DHOPE_IO_USE_OPENSSL)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
+    target_link_libraries(hope-io ${OPENSSL_LIBRARIES})
     include_directories(${OPENSSL_INCLUDE_DIR})
 else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
