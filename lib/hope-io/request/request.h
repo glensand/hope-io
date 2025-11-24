@@ -133,19 +133,19 @@ namespace hope::io::http {
         const std::string_view& bin)
     {
         const std::string boundary = "----MyBoundary7d7b3d"; // can be more random
-        std::ostringstream bodyStream;
+        std::ostringstream body_stream;
 
         // Add file part
-        bodyStream << "--" << boundary << "\r\n";
-        bodyStream << "Content-Disposition: form-data; name=\"file\"; filename=\"" << filename << "\"\r\n";
-        bodyStream << "Content-Type: application/octet-stream\r\n\r\n";
-        bodyStream.write(reinterpret_cast<const char*>(bin.data()), bin.size());
-        bodyStream << "\r\n";
+        body_stream << "--" << boundary << "\r\n";
+        body_stream << "Content-Disposition: form-data; name=\"file\"; filename=\"" << filename << "\"\r\n";
+        body_stream << "Content-Type: application/octet-stream\r\n\r\n";
+        body_stream.write(reinterpret_cast<const char*>(bin.data()), bin.size());
+        body_stream << "\r\n";
 
         // End of multipart
-        bodyStream << "--" << boundary << "--\r\n";
+        body_stream << "--" << boundary << "--\r\n";
 
-        std::string body = bodyStream.str();
+        std::string body = body_stream.str();
 
         // Build request
         std::ostringstream request;
@@ -160,7 +160,7 @@ namespace hope::io::http {
     }
 
     inline std::string upload_file(const std::string& endpoint, std::string_view payload,
-        const std::string file_name) {
+        const std::string& file_name) {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
@@ -172,6 +172,81 @@ namespace hope::io::http {
         stream->connect(url.hostname, url.port);
         stream->write(req.data(), req.size());
    
+        std::string buffer;
+        stream->stream_in(buffer);
+        stream->disconnect();
+        delete stream;
+        return buffer;
+    }
+
+    inline std::string upload_file_2(const std::string& endpoint, const std::string& path , const std::string& file_name) {
+        if (!std::filesystem::exists(path)) {
+            throw std::runtime_error("File not found: " + file_name);
+        }
+        auto url = extract_url(endpoint);
+        hope::io::stream* stream = nullptr;
+        if (url.protocol == "http") {
+            stream = hope::io::create_stream();
+        } else {
+            stream = hope::io::create_tls_stream();
+        }
+
+        const std::string boundary = "----MyBoundary7d7b3d"; // can be more random
+        std::string body_part1;
+        {
+            std::ostringstream bodystream;
+
+            // Add file part
+            bodystream << "--" << boundary << "\r\n";
+            bodystream << "Content-Disposition: form-data; name=\"file\"; filename=\"" << file_name << "\"\r\n";
+            bodystream << "Content-Type: application/octet-stream\r\n\r\n";
+            body_part1 = bodystream.str();
+        }
+
+        std::string body_part2;
+        {
+            std::ostringstream bodystream;
+
+            bodystream << "\r\n";
+
+            // End of multipart
+            bodystream << "--" << boundary << "--\r\n";
+
+            body_part2 = bodystream.str();
+        }
+
+        const auto file_size = std::filesystem::file_size(file_name);
+        const auto body_size = body_part1.size() + body_part2.size() + file_size;
+
+        std::string request_header;
+        {
+            std::ostringstream request;
+            request << "POST " << url.path << " HTTP/1.1\r\n";
+            request << "Host: " << url.hostname << "\r\n";
+            request << "Content-Type: multipart/form-data; boundary=" << boundary << "\r\n";
+            request << "Content-Length: " << body_size << "\r\n";
+            request << "Connection: close\r\n\r\n";
+            request_header = request.str();
+        }
+
+        stream->connect(url.hostname, url.port);
+        stream->write(request_header.data(), request_header.size());
+        stream->write(body_part1.data(), body_part1.size());
+
+        {
+            std::ifstream in(path, std::ios::binary);
+            std::size_t read_size = 0;
+            constexpr auto buffer_size = 65536;
+            char buffer[buffer_size];
+            while (read_size < file_size) {
+                in.read(buffer, buffer_size);
+                const auto current_read = in.gcount() - read_size;
+                stream->write(buffer, current_read);
+                read_size += current_read;
+            }
+        }
+        stream->write(body_part2.data(), body_part2.size());
+
         std::string buffer;
         stream->stream_in(buffer);
         stream->disconnect();
