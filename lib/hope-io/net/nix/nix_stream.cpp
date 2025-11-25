@@ -52,22 +52,30 @@ namespace {
         }
 
         virtual void connect(const std::string_view ip, std::size_t port) override {
-            struct hostent* host;
-            if ((host = gethostbyname(ip.data())) == nullptr) {
+            struct addrinfo hints{};
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+
+            struct addrinfo* res;
+            int err = getaddrinfo(ip.data(), nullptr, &hints, &res);
+            if (err != 0) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot resolve ip: " +
                                          std::string(strerror(errno)));
-	        }
+            }
+
+            struct sockaddr_in serv_addr{};
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_port = htons(port);
+
+            auto* ipv4 = (struct sockaddr_in*)res->ai_addr;
+            serv_addr.sin_addr = ipv4->sin_addr;
+
+            freeaddrinfo(res);
 
             if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot create socket: " +
                                          std::string(strerror(errno)));
 	        }
-
-            struct sockaddr_in serv_addr{};
-            serv_addr.sin_family = AF_INET;
-	        serv_addr.sin_port = htons(port);
-	        serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
-	        bzero(&(serv_addr.sin_zero), 8);
 
 	        if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot connect to host: " +
