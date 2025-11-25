@@ -239,7 +239,7 @@ namespace hope::io::http {
         {
             std::ifstream in(path, std::ios::binary);
             std::size_t read_size = 0;
-            constexpr auto buffer_size = 65536;
+            constexpr auto buffer_size = 655360;
             char buffer[buffer_size];
             while (read_size < file_size) {
                 in.read(buffer, buffer_size);
