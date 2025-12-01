@@ -119,7 +119,6 @@ namespace hope::io::http {
             "Host: " + url.hostname + "\r\n" +
             header_data + 
             "Connection: close\r\n\r\n";
-        std::cout<<request;
         stream->connect(url.hostname, url.port);
         stream->write(request.data(), request.size());
         std::string buffer;
