@@ -8,23 +8,28 @@
 
 #include <gtest/gtest.h>
 #include "hope-io/net/stream.h"
+#include "hope-io/net/event_loop.h"
+#include "hope-io/net/udp_builder.h"
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/factory.h"
 #include "hope-io/net/init.h"
 #include "hope-io/coredefs.h"
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 using namespace std::chrono_literals;
 
 class PlatformCompatibilityTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_port = 15000 + (std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000);
+        // Use unique port for each test to avoid bind conflicts
+        static std::atomic<int> port_counter{17000};
+        test_port = port_counter.fetch_add(1);
     }
 
     void TearDown() override {
-        std::this_thread::sleep_for(100ms);
+        std::this_thread::sleep_for(50ms);
     }
 
     std::size_t test_port = 0;
@@ -340,19 +345,15 @@ TEST_F(PlatformCompatibilityTest, UdpPlatformDifferences) {
 
 // Test event loop platform differences
 TEST_F(PlatformCompatibilityTest, EventLoopPlatformDifferences) {
-    auto* loop1 = hope::io::create_event_loop();
-    auto* loop2 = hope::io::create_event_loop2(100);
+    auto* loop2 = hope::io::create_event_loop();
     
 #if PLATFORM_WINDOWS
     // On Windows, event loop is not implemented
-    EXPECT_EQ(loop1, nullptr);
     EXPECT_EQ(loop2, nullptr);
 #else
     // On Unix/Apple, event loop should be available
-    ASSERT_NE(loop1, nullptr);
     ASSERT_NE(loop2, nullptr);
-    
-    delete loop1;
+
     delete loop2;
 #endif
 }

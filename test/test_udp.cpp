@@ -14,17 +14,20 @@
 #include <thread>
 #include <chrono>
 #include <cstring>
+#include <atomic>
 
 using namespace std::chrono_literals;
 
 class UdpTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_port = 15000 + (std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000);
+        // Use unique port for each test to avoid bind conflicts
+        static std::atomic<int> port_counter{20000};
+        test_port = port_counter.fetch_add(1);
     }
 
     void TearDown() override {
-        std::this_thread::sleep_for(100ms);
+        std::this_thread::sleep_for(50ms);
     }
 
     std::size_t test_port = 0;

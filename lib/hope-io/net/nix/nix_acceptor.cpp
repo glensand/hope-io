@@ -65,10 +65,22 @@ namespace {
 
             auto backlog = 10; // maximum length for the queue of pending connections
             listen(m_socket, backlog);
+            
+            // Apply any options that were set before open() was called
+            if (m_options.non_block_mode) {
+                int flags = fcntl(m_socket, F_GETFL, 0);
+                if (flags != -1) {
+                    fcntl(m_socket, F_SETFL, flags | O_NONBLOCK);
+                }
+            }
         }
 
         virtual void set_options(const hope::io::stream_options& opt) override {
             m_options = opt;
+            // If socket is not yet created (open() not called), just store options
+            if (m_socket == -1) {
+                return;
+            }
             // for listen socket we can set block mode, also need to set connect timeout
             int flags = fcntl(m_socket, F_GETFL, 0);
             if (flags == -1) {

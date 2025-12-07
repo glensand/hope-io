@@ -48,7 +48,10 @@ namespace hope::io {
                     }
                 };
             }
-            ~event_loop_impl() override = default;
+            ~event_loop_impl() override {
+                // Clear the static callback to avoid dangling pointer issues
+                event_loop::connection::on_state_changed = nullptr;
+            }
 
         private:
             struct buffer_pool final {

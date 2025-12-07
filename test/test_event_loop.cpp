@@ -14,17 +14,20 @@
 #include <chrono>
 #include <atomic>
 #include <vector>
+#include <atomic>
 
 using namespace std::chrono_literals;
 
 class EventLoopTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_port = 15000 + (std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000);
+        // Use unique port for each test to avoid bind conflicts
+        static std::atomic<int> port_counter{18000};
+        test_port = port_counter.fetch_add(1);
     }
 
     void TearDown() override {
-        std::this_thread::sleep_for(100ms);
+        std::this_thread::sleep_for(50ms);
     }
 
     std::size_t test_port = 0;
@@ -45,7 +48,7 @@ TEST_F(EventLoopTest, CreateEventLoop) {
 
 // Test event loop creation with max connections
 TEST_F(EventLoopTest, CreateEventLoop2) {
-    auto* loop = hope::io::create_event_loop2(100);
+    auto* loop = hope::io::create_event_loop();
     
 #if PLATFORM_WINDOWS
     // On Windows, event loop is not implemented

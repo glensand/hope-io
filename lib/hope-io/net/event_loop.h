@@ -122,6 +122,9 @@ namespace hope::io {
             bool operator==(const connection& rhs) const {
                 return descriptor == rhs.descriptor;
             }
+            bool operator!=(const connection& rhs) const {
+                return descriptor != rhs.descriptor;
+            }
             struct hash final {
                 std::size_t operator()(const connection& obj) const {
                     return std::hash<int32_t>()(obj.descriptor);

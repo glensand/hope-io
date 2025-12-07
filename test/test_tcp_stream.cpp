@@ -17,13 +17,16 @@
 #include <cstring>
 #include <vector>
 #include <functional>
+#include <atomic>
 
 using namespace std::chrono_literals;
 
 class TcpStreamTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        test_port = 15000 + (std::hash<std::thread::id>{}(std::this_thread::get_id()) % 10000);
+        // Use unique port for each test to avoid bind conflicts
+        static std::atomic<int> port_counter{15000};
+        test_port = port_counter.fetch_add(1);
         acceptor = hope::io::create_acceptor();
         acceptor->open(test_port);
     }
@@ -34,7 +37,7 @@ protected:
             acceptor = nullptr;
         }
         // Give OS time to release the port
-        std::this_thread::sleep_for(100ms);
+        std::this_thread::sleep_for(50ms);
     }
 
     hope::io::acceptor* acceptor = nullptr;
@@ -71,7 +74,7 @@ TEST_F(TcpStreamTest, WriteAndRead) {
     const std::string test_message = "Hello, World!";
     std::string received_message;
     
-    std::thread server_thread([this, &received_message]() {
+    std::thread server_thread([this, &received_message, test_message]() {
         auto* conn = acceptor->accept();
         char buffer[256] = {0};
         size_t received = conn->read(buffer, test_message.length());
@@ -172,10 +175,8 @@ TEST_F(TcpStreamTest, ConnectionTimeoutEnforced) {
 // Test that read timeout is actually enforced (Unix only, Windows applies during connect)
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(TcpStreamTest, ReadTimeoutEnforced) {
-    auto* acceptor = hope::io::create_acceptor();
-    acceptor->open(test_port);
-    
-    std::thread server_thread([&acceptor]() {
+    // Use the acceptor from SetUp() (already bound to test_port)
+    std::thread server_thread([this]() {
         auto* conn = acceptor->accept();
         // Don't send any data, just wait
         std::this_thread::sleep_for(500ms);
@@ -212,17 +213,14 @@ TEST_F(TcpStreamTest, ReadTimeoutEnforced) {
     delete client;
     
     server_thread.join();
-    delete acceptor;
 }
 #endif
 
 // Test that write timeout is actually enforced (Unix only)
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(TcpStreamTest, WriteTimeoutEnforced) {
-    auto* acceptor = hope::io::create_acceptor();
-    acceptor->open(test_port);
-    
-    std::thread server_thread([&acceptor]() {
+    // Use the acceptor from SetUp() (already bound to test_port)
+    std::thread server_thread([this]() {
         auto* conn = acceptor->accept();
         // Don't read any data, let send buffer fill up
         std::this_thread::sleep_for(1000ms);
@@ -256,7 +254,6 @@ TEST_F(TcpStreamTest, WriteTimeoutEnforced) {
     delete client;
     
     server_thread.join();
-    delete acceptor;
 }
 #endif
 
@@ -303,10 +300,8 @@ TEST_F(TcpStreamTest, AllOptionsParameters) {
 // Test non-blocking mode (Unix only, as it requires set_options after connect)
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(TcpStreamTest, NonBlockingMode) {
-    auto* acceptor = hope::io::create_acceptor();
-    acceptor->open(test_port);
-    
-    std::thread server_thread([&acceptor]() {
+    // Use the acceptor from SetUp() (already bound to test_port)
+    std::thread server_thread([this]() {
         auto* conn = acceptor->accept();
         // Send data immediately
         const char* data = "Hello";
@@ -353,7 +348,6 @@ TEST_F(TcpStreamTest, NonBlockingMode) {
     delete client;
     
     server_thread.join();
-    delete acceptor;
 }
 #endif
 
@@ -659,7 +653,10 @@ TEST_F(TcpStreamTest, GetEndpoint) {
     server_thread.join();
     
     // On Unix, should get "127.0.0.1", on Windows might be empty
-    // Just check it doesn't crash
-    EXPECT_NO_THROW(endpoint);
+    // Endpoint should be non-empty on Unix
+#if PLATFORM_LINUX || PLATFORM_APPLE
+    EXPECT_FALSE(endpoint.empty());
+    EXPECT_EQ(endpoint, "127.0.0.1");
+#endif
 }
 
