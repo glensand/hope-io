@@ -13,6 +13,7 @@
 #include <coroutine>
 #include <exception>
 #include <utility>
+#include <stdexcept>
 
 #if PLATFORM_LINUX || PLATFORM_APPLE
 #include <sys/select.h>

@@ -6,6 +6,7 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/hope-io
  */
 
+#if PLATFORM_LINUX
 #include "message.h"
 
 #include "hope-io/net/event_loop.h"
@@ -100,3 +101,6 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+#else
+int main(int argc, char *argv[]) {}
+#endif
