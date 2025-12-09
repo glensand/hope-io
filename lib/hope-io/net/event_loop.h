@@ -58,10 +58,7 @@ namespace hope::io {
 
             void shrink() noexcept {
                 if (m_head > 0 && m_tail > 0) {
-                    // todo:: memmove for overlapping regions?
-                    for (std::size_t i = 0; i < count(); ++i) {
-                        m_impl[i] = m_impl[i  + m_head];
-                    }
+                    std::memmove(m_impl.data(), m_impl.data() + m_head, count());
                     m_tail -= m_head;
                     m_head = 0;
                 }
@@ -156,6 +153,7 @@ namespace hope::io {
             std::size_t max_accepts_per_tick = 128;
             std::size_t port = 9393;
             int epoll_temeout = 1000;
+            class acceptor* custom_acceptor = nullptr;  // If provided, this acceptor will be used instead of creating a default one
         };
 
         virtual ~event_loop() = default;

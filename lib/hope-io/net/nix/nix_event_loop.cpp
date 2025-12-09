@@ -67,8 +67,14 @@ namespace hope::io {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
                 //NAMED_SCOPE(Process);
                 // TODO:: multiport option?
-                m_acceptor = create_acceptor();
-                m_acceptor->open(cfg.port);
+                if (cfg.custom_acceptor != nullptr) {
+                    m_acceptor = cfg.custom_acceptor;
+                    m_owns_acceptor = false;
+                } else {
+                    m_acceptor = create_acceptor();
+                    m_acceptor->open(cfg.port);
+                    m_owns_acceptor = true;
+                }
                 stream_options opt;
                 opt.non_block_mode = true;
                 m_acceptor->set_options(opt);
@@ -157,6 +163,10 @@ namespace hope::io {
 
             virtual void stop() override {
                 m_running = false;
+                if (m_owns_acceptor && m_acceptor != nullptr) {
+                    delete m_acceptor;
+                    m_acceptor = nullptr;
+                }
             }
 
             void handle_accept(callbacks& cb) {
@@ -176,6 +186,7 @@ namespace hope::io {
                             connection dumb{ -1 };
                             // TODO:: add adress to message
                             cb.on_err(dumb, "Cannot set flags for connection, skip this one");
+                            ::close(sock);
                             sock = -1;
                         }
                     }
@@ -246,6 +257,7 @@ namespace hope::io {
             config m_cfg;
             buffer_pool m_pl;
             hope::io::acceptor* m_acceptor = nullptr;
+            bool m_owns_acceptor = false;
             std::atomic<bool> m_running = true;
         };
         return new event_loop_impl;

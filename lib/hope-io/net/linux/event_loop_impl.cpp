@@ -151,6 +151,7 @@ namespace hope::io {
                             connection dumb;
                             // TODO:: add adress to message
                             cb.on_err(dumb, "Cannot set flags for connection, skip this one");
+                            ::close(sock);
                             sock = -1;
                         }
                     }

@@ -61,7 +61,7 @@ TEST_F(UdpTest, UdpBuilderInit) {
 
 // Test UDP receiver creation
 TEST_F(UdpTest, CreateReceiver) {
-    auto* receiver = hope::io::create_receiver();
+    auto* receiver = hope::io::create_udp_receiver();
     
 #if PLATFORM_WINDOWS
     // On Windows, receiver is not implemented
@@ -74,7 +74,7 @@ TEST_F(UdpTest, CreateReceiver) {
 
 // Test UDP sender creation
 TEST_F(UdpTest, CreateSender) {
-    auto* sender = hope::io::create_sender();
+    auto* sender = hope::io::create_udp_sender();
     
 #if PLATFORM_WINDOWS
     // On Windows, sender is not implemented
@@ -96,13 +96,13 @@ TEST_F(UdpTest, SendReceive) {
     builder->init(test_port);
     int32_t server_socket = builder->platform_socket();
     
-    auto* sender = hope::io::create_sender();
+    auto* sender = hope::io::create_udp_sender();
     if (!sender) {
         delete builder;
         GTEST_SKIP() << "UDP sender not implemented on this platform";
     }
     
-    auto* receiver = hope::io::create_receiver(server_socket);
+    auto* receiver = hope::io::create_udp_receiver(server_socket);
     if (!receiver) {
         delete sender;
         delete builder;
@@ -146,13 +146,13 @@ TEST_F(UdpTest, MultiplePackets) {
     builder->init(test_port);
     int32_t server_socket = builder->platform_socket();
     
-    auto* sender = hope::io::create_sender();
+    auto* sender = hope::io::create_udp_sender();
     if (!sender) {
         delete builder;
         GTEST_SKIP() << "UDP sender not implemented on this platform";
     }
     
-    auto* receiver = hope::io::create_receiver(server_socket);
+    auto* receiver = hope::io::create_udp_receiver(server_socket);
     if (!receiver) {
         delete sender;
         delete builder;
@@ -198,7 +198,7 @@ TEST_F(UdpTest, MultiplePackets) {
 // Test UDP receiver with uninitialized socket
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(UdpTest, ReceiverUninitializedSocket) {
-    auto* receiver = hope::io::create_receiver();
+    auto* receiver = hope::io::create_udp_receiver();
     if (!receiver) {
         GTEST_SKIP() << "UDP receiver not implemented on this platform";
     }
@@ -213,7 +213,7 @@ TEST_F(UdpTest, ReceiverUninitializedSocket) {
 // Test UDP sender disconnect
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(UdpTest, SenderDisconnect) {
-    auto* sender = hope::io::create_sender();
+    auto* sender = hope::io::create_udp_sender();
     if (!sender) {
         GTEST_SKIP() << "UDP sender not implemented on this platform";
     }
