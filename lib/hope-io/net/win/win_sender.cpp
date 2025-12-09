@@ -14,7 +14,7 @@
 
 namespace hope::io {
 
-    stream* create_sender(unsigned long long socket) {
+    udp_sender* create_udp_sender(unsigned long long socket) {
         return nullptr;
     }
 

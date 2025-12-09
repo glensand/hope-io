@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
         std::terminate();
     }
 
-    auto* receiver = hope::io::create_receiver(udp_builder->platform_socket());
+    auto* receiver = hope::io::create_udp_receiver(udp_builder->platform_socket());
     try {
         receiver->connect("localhost", 1338);
     }
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         std::terminate();
     }
 
-    auto* sender = hope::io::create_sender(udp_builder->platform_socket());
+    auto* sender = hope::io::create_udp_sender(udp_builder->platform_socket());
     try {
         sender->connect("localhost", 1338);
     }

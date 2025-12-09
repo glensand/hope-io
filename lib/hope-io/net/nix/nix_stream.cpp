@@ -114,7 +114,7 @@ namespace {
         }
 
         virtual size_t read_once(void* data, std::size_t length) override {
-            return recv(m_socket, (char*)data, length - 1, 0);
+            return recv(m_socket, (char*)data, length, 0);
         }
 
         virtual void stream_in(std::string& buffer) override {

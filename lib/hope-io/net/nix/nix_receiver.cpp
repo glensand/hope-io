@@ -10,7 +10,7 @@
 
 #if PLATFORM_LINUX || PLATFORM_APPLE
 
-#include "hope-io/net/stream.h"
+#include "hope-io/net/udp_receiver.h"
 #include "hope-io/net/factory.h"
 
 #include <cstdlib>
@@ -24,27 +24,18 @@
 
 namespace {
 
-    // TODO:: remove inheritance
-    class nix_receiver final : public hope::io::stream {
+    class nix_udp_receiver final : public hope::io::udp_receiver {
     public:
-        explicit nix_receiver(unsigned long long in_socket) {
+        explicit nix_udp_receiver(unsigned long long in_socket) {
             if (in_socket != 0)
                 m_socket = in_socket;
         }
 
-        virtual ~nix_receiver() override {
+        virtual ~nix_udp_receiver() override {
             disconnect();
         }
 
     private:
-        virtual std::string get_endpoint() const override {
-            struct sockaddr_in remote_sin{};
-            socklen_t remote_sinlen = sizeof(remote_sin);
-            getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen);
-            char *peeraddrpresn = inet_ntoa(remote_sin.sin_addr);
-            return peeraddrpresn;
-        }
-
         [[nodiscard]] int32_t platform_socket() const override {
             return (int32_t)m_socket;
         }
@@ -52,12 +43,12 @@ namespace {
         virtual void connect(const std::string_view ip, std::size_t port) override {
             struct hostent *host;
             if ((host = gethostbyname(ip.data())) == nullptr) {
-                throw std::runtime_error("hope-io/nix_receiver: cannot resolve ip: " +
+                throw std::runtime_error("hope-io/nix_udp_receiver: cannot resolve ip: " +
                                          std::string(strerror(errno)));
             }
 
             if (!m_socket && (m_socket = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-                throw std::runtime_error("hope-io/nix_receiver: cannot create socket: " +
+                throw std::runtime_error("hope-io/nix_udp_receiver: cannot create socket: " +
                                          std::string(strerror(errno)));
             }
 
@@ -68,37 +59,22 @@ namespace {
         }
 
         virtual void disconnect() override {
-            close(m_socket);
-            m_socket = 0;
-        }
-
-        virtual void write(const void* data, std::size_t length) override {
-            assert(false);
+            if (m_socket != 0) {
+                close(m_socket);
+                m_socket = 0;
+            }
         }
 
         virtual size_t read(void* data, std::size_t length) override {
-            socklen_t len;
+            socklen_t len = sizeof(serv_addr);
             auto recv_bytes = recvfrom(m_socket, (char*)data, length, 0,
                                        (struct sockaddr *)&serv_addr, &len);
             if (recv_bytes == -1) {
-                throw std::runtime_error("hope-io/nix_receiver: failed to read data: " +
+                throw std::runtime_error("hope-io/nix_udp_receiver: failed to read data: " +
                                          std::string(strerror(errno)));
             }
 
             return recv_bytes;
-        }
-
-        virtual size_t read_once(void* data, std::size_t length) override {
-            assert(false && "Not implemented");
-            return 0u;
-        }
-
-        virtual void stream_in(std::string& buffer) override {
-            assert(false && "Not implemented");
-        }
-
-        virtual void set_options(const hope::io::stream_options&) override {
-            assert(false && "Not implemented");
         }
         
         int m_socket{ 0 };
@@ -110,8 +86,8 @@ namespace {
 
 namespace hope::io {
 
-    stream* create_receiver(unsigned long long socket) {
-        return new nix_receiver(socket);
+    udp_receiver* create_udp_receiver(unsigned long long socket) {
+        return new nix_udp_receiver(socket);
     }
 
 }

@@ -323,8 +323,8 @@ TEST_F(PlatformCompatibilityTest, UnixAcceptorOptions) {
 // Test UDP platform differences
 TEST_F(PlatformCompatibilityTest, UdpPlatformDifferences) {
     auto* builder = hope::io::create_udp_builder();
-    auto* receiver = hope::io::create_receiver();
-    auto* sender = hope::io::create_sender();
+    auto* receiver = hope::io::create_udp_receiver();
+    auto* sender = hope::io::create_udp_sender();
     
 #if PLATFORM_WINDOWS
     // On Windows, UDP is not implemented

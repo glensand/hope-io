@@ -48,8 +48,14 @@ namespace {
 
     private:
         virtual std::string get_endpoint() const override {
-            assert(false && "not implemented");
-            return "";
+            struct sockaddr_in remote_sin{};
+            int remote_sinlen = sizeof(remote_sin);
+            if (getpeername(m_socket, (struct sockaddr*)&remote_sin, &remote_sinlen) == SOCKET_ERROR) {
+                return "";
+            }
+            char addr_str[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &remote_sin.sin_addr, addr_str, INET_ADDRSTRLEN);
+            return std::string(addr_str);
         }
 
         [[nodiscard]] int32_t platform_socket() const override {
@@ -175,7 +181,7 @@ namespace {
         }
 
         virtual size_t read_once(void* data, std::size_t length) override {
-            const auto received = recv(m_socket, (char*)data, length - 1, 0);
+            const auto received = recv(m_socket, (char*)data, length, 0);
             if (received < 0) {
                 // TODO use WSAGetLastError
                 throw_error("hope-io/win_stream: Failed to receive data", WSAGetLastError());

@@ -106,8 +106,8 @@ This test suite provides comprehensive testing for the hope-io networking librar
    - **Impact**: Inconsistent behavior, potential timeout issues
 
 4. **UDP not implemented**
-   - `create_receiver()` returns `nullptr`
-   - `create_sender()` returns `nullptr`
+   - `create_udp_receiver()` returns `nullptr`
+   - `create_udp_sender()` returns `nullptr`
    - `create_udp_builder()` returns `nullptr`
    - **Impact**: UDP functionality unavailable on Windows
 
