@@ -30,6 +30,8 @@ add_executable(hope-io-test
     test_tls.cpp
     test_error_handling.cpp
     test_platform_compatibility.cpp
+    test_coro_stream.cpp
+    test_tls_event_loop.cpp
 )
 
 target_include_directories(hope-io-test PRIVATE ../../lib)
