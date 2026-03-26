@@ -14,7 +14,8 @@ namespace hope::io {
 
     // TCP stuff
     class acceptor* create_acceptor();
-    class stream* create_stream(unsigned long long socket = 0);
+    /// Pass \p socket == (unsigned long long)-1 for a new client stream (not connected yet). Never use 0 here: fd 0 is stdin.
+    class stream* create_stream(unsigned long long socket = static_cast<unsigned long long>(-1));
         
     // TLS stuff
     class acceptor* create_tls_acceptor(std::string_view key, std::string_view cert);

@@ -31,7 +31,12 @@ namespace {
     class nix_stream final : public hope::io::stream {
     public:
         explicit nix_stream(unsigned long long in_socket) {
-            m_socket = in_socket;
+            // Default from create_stream(): unconnected stream. Must not use 0 — fd 0 is stdin.
+            if (in_socket == static_cast<unsigned long long>(-1)) {
+                m_socket = -1;
+            } else {
+                m_socket = static_cast<int>(in_socket);
+            }
         }
 
         virtual ~nix_stream() override {
@@ -84,7 +89,9 @@ namespace {
         }
 
         virtual void disconnect() override {
-            close(m_socket);
+            if (m_socket >= 0) {
+                close(m_socket);
+            }
             m_socket = -1;
         }
 
@@ -122,7 +129,9 @@ namespace {
         }
 
         virtual void set_options(const hope::io::stream_options& opt) override {
-            assert(m_socket != -1);
+            if (m_socket < 0) {
+                return;
+            }
             struct timeval timeout;
             timeout.tv_sec = opt.write_timeout / 1000;
             timeout.tv_usec = 1000 * (opt.write_timeout - timeout.tv_sec * 1000);
@@ -162,6 +171,7 @@ namespace hope::io {
         return new nix_stream(socket);
     }
 
-}
+} // namespace hope::io
+
 
 #endif

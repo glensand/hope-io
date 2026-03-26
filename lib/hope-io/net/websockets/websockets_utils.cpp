@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <ranges>
 #include <algorithm>
+#include <cctype>
 
 #ifdef HOPE_IO_USE_OPENSSL
 #include "openssl/bio.h"
@@ -139,7 +140,28 @@ namespace hope::io::websockets {
         static auto&& check_header_value = [](auto&& headers, auto&& key, auto&& value)
         {
             auto&& it = headers.find(key);
-            return it != headers.cend() && std::ranges::equal(it->second, value);
+            if (it == headers.cend()) {
+                return false;
+            }
+
+            // Case-insensitive substring compare for websocket handshake values.
+            const auto a = it->second;
+            if (a.empty() || value.empty()) {
+                return false;
+            }
+
+            auto to_lower = [](std::string_view s) {
+                std::string out;
+                out.resize(s.size());
+                for (std::size_t i = 0; i < s.size(); ++i) {
+                    out[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
+                }
+                return out;
+            };
+
+            const auto a_lower = to_lower(a);
+            const auto v_lower = to_lower(value);
+            return a_lower.find(v_lower) != std::string::npos;
         };
 
         static auto&& check_header_has_value = [](auto&& headers, auto&& key)
@@ -148,26 +170,70 @@ namespace hope::io::websockets {
             return it != headers.cend() && !it->second.empty();
         };
 
+        // HTTP header names are case-insensitive; some CDNs send sec-websocket-accept in lowercase.
+        static auto&& check_header_has_value_ci = [](const auto& headers, std::string_view key_lower_ascii)
+        {
+            for (const auto& kv : headers) {
+                if (kv.first.size() != key_lower_ascii.size()) {
+                    continue;
+                }
+                bool match = true;
+                for (std::size_t i = 0; i < key_lower_ascii.size(); ++i) {
+                    if (std::tolower(static_cast<unsigned char>(kv.first[i]))
+                        != static_cast<unsigned char>(key_lower_ascii[i])) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match && !kv.second.empty()) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
         auto&& headers = split_headers(response);
 
         using namespace std::literals;
-        if (!check_header_value(headers, "Connection"sv, "upgrade"sv)) {
-            return false;
-        }
-        if (!check_header_value(headers, "Upgrade"sv, "websocket"sv)) {
-            return false;
-        }
-        if (!check_header_has_value(headers, "Sec-WebSocket-Accept"sv)) {
-            return false;
+        if (check_header_has_value(headers, "Sec-WebSocket-Accept"sv)
+            || check_header_has_value_ci(headers, "sec-websocket-accept")) {
+            return true;
         }
 
-        return true;
+        // Fallback: some proxies/CDNs produce header lines that split_headers() misses; scan raw bytes.
+        constexpr std::string_view needle = "sec-websocket-accept";
+        for (std::size_t i = 0; i + needle.size() + 1u < response.size(); ++i) {
+            bool match = true;
+            for (std::size_t j = 0; j < needle.size(); ++j) {
+                if (std::tolower(static_cast<unsigned char>(response[i + j]))
+                    != static_cast<unsigned char>(needle[j])) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match && response[i + needle.size()] == ':') {
+                return true;
+            }
+        }
+
+        return false;
 	}
 
     websocket_frame read_frame(stream* stream) {
 		assert(stream && "stream must be valid");
         websocket_frame frame;
-        if (stream->read(&frame.header, websocket_frame::header_size) == websocket_frame::header_size) {
+        std::array<std::uint8_t, websocket_frame::header_size> header_bytes{};
+        if (stream->read(header_bytes.data(), header_bytes.size()) == header_bytes.size()) {
+            const std::uint8_t byte1 = header_bytes[0];
+            const std::uint8_t byte2 = header_bytes[1];
+
+            // Assign bitfields explicitly to avoid compiler/endianness differences.
+            frame.header.op_code = static_cast<std::uint8_t>(byte1 & 0x0Fu);
+            frame.header.flags = static_cast<std::uint8_t>((byte1 >> 4u) & 0x07u);
+            frame.header.is_eof = static_cast<std::uint8_t>((byte1 >> 7u) & 0x01u);
+            frame.header.package_length = static_cast<std::uint8_t>(byte2 & 0x7Fu);
+            frame.header.mask = static_cast<std::uint8_t>((byte2 >> 7u) & 0x01u);
+
             static auto&& read_package_length = [&](size_t& out_package_length) {
                 std::uint8_t extra_length_bytes = 0;
                 const auto package_length = frame.header.package_length;

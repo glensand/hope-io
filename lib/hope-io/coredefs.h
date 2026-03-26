@@ -8,6 +8,7 @@
 
 #pragma once
 
+#ifndef WEBSOCK_ENABLE
 #if defined(__clang__)
 #define WEBSOCK_ENABLE 0
 #elif defined(__GNUC__) || defined(__GNUG__)
@@ -18,6 +19,7 @@
 #endif
 #elif defined(_MSC_VER)
 #define WEBSOCK_ENABLE 0
+#endif
 #endif
 
 // TODO:: move to cmake variable

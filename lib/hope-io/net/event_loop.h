@@ -13,6 +13,7 @@
 #include <cassert>
 #include <utility>
 #include <array>
+#include <cstring>
 
 namespace hope::io {
 
