@@ -13,6 +13,7 @@
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
 #include <array>
+#include <unistd.h>
 
 #ifdef HOPE_IO_USE_OPENSSL
 
@@ -71,6 +72,12 @@ namespace {
 
             m_tcp_acceptor = hope::io::create_acceptor();
             m_tcp_acceptor->open(port);
+        }
+
+        virtual void close() override {
+            if (m_tcp_acceptor){
+                m_tcp_acceptor->close();
+            }
         }
 
         virtual hope::io::stream* accept() override {

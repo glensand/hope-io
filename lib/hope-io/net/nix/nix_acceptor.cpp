@@ -7,6 +7,8 @@
  */
 
 #include "hope-io/coredefs.h"
+#include <string>
+#include <sys/errno.h>
 
 #if PLATFORM_LINUX || PLATFORM_APPLE
 
@@ -60,12 +62,16 @@ namespace {
 	        memset(&(server_sockaddr.sin_zero),0,8);
 
 	        if ((bind(m_socket, (struct sockaddr *)&server_sockaddr, sizeof(struct sockaddr))) == -1) {
-                throw std::runtime_error("hope-io/nix_acceptor: cannot bind socket");
+                throw std::runtime_error(
+                        "hope-io/nix_acceptor: cannot bind socket port:" + std::to_string(port) +
+                        "\n err_code:" + std::to_string(errno) +
+                        "\n err_msg:" + strerror(errno)
+                );
             }
 
             auto backlog = 10; // maximum length for the queue of pending connections
             listen(m_socket, backlog);
-            
+
             // Apply any options that were set before open() was called
             if (m_options.non_block_mode) {
                 int flags = fcntl(m_socket, F_GETFL, 0);
@@ -73,6 +79,10 @@ namespace {
                     fcntl(m_socket, F_SETFL, flags | O_NONBLOCK);
                 }
             }
+        }
+
+        virtual void close() override {
+            ::close(m_socket);
         }
 
         virtual void set_options(const hope::io::stream_options& opt) override {

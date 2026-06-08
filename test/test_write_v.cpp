@@ -24,14 +24,13 @@ using namespace std::chrono_literals;
 class WriteVTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        static std::atomic<int> port_counter{16000};
-        test_port = port_counter.fetch_add(1);
         acceptor = hope::io::create_acceptor();
         acceptor->open(test_port);
     }
 
     void TearDown() override {
         if (acceptor) {
+            acceptor->close();
             delete acceptor;
             acceptor = nullptr;
         }
@@ -39,7 +38,7 @@ protected:
     }
 
     hope::io::acceptor* acceptor = nullptr;
-    std::size_t test_port = 0;
+    std::size_t test_port = 17000;
 };
 
 // Test write_v with a single buffer — equivalent to write()
@@ -248,7 +247,6 @@ TEST_F(WriteVTest, ConsistencyWithWrite) {
 
     // Second: write with concatenated data
     std::this_thread::sleep_for(50ms);
-    acceptor->open(test_port);
 
     std::thread server_thread2([this, &received_write, expected]() {
         auto* conn = acceptor->accept();
