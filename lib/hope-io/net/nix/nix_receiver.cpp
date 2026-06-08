@@ -15,6 +15,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <stdexcept>
 #include <unistd.h>
 #include <netdb.h>
@@ -76,7 +77,7 @@ namespace {
 
             return recv_bytes;
         }
-        
+
         int m_socket{ 0 };
 
         struct sockaddr_in serv_addr{};

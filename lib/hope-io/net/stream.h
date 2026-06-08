@@ -11,6 +11,7 @@
 #include <memory>
 #include <cassert>
 #include <string>
+#include <span>
 #include <type_traits>
 
 namespace hope::io {
@@ -38,6 +39,11 @@ namespace hope::io {
         virtual void disconnect() = 0;
 
         virtual void write(const void *data, std::size_t length) = 0;
+
+        /// Write multiple non-contiguous buffers in a single syscall (writev / WSASend).
+        /// Falls back to sequential write() on platforms that do not support scatter-gather.
+        virtual void write_v(std::span<const std::span<const char>> buffers) = 0;
+
         virtual size_t read(void *data, std::size_t length) = 0;
         virtual size_t read_once(void* data, std::size_t length) = 0;
 

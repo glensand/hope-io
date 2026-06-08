@@ -55,16 +55,30 @@ namespace hope::io {
         }
 
         virtual void write(const void *data, std::size_t length) override {
+            if (length == 0) return;
+
             std::size_t total = 0;
-            // TODO:: do we need cycle here?
-            do
-            {
-                const auto sent = SSL_write(m_ssl, (char*)data + total, length - total);
+            while (total < length) {
+                const auto sent = SSL_write(m_ssl, static_cast<const char*>(data) + total,
+                                            length - total);
                 if (sent <= 0)
                     throw std::runtime_error("hope-io/tls_stream: cannot write to socket");
                 total += sent;
             }
-            while (total < length);
+        }
+
+        virtual void write_v(std::span<const std::span<const char>> buffers) override {
+            // OpenSSL SSL_write takes a single buffer, so we fall back to sequential writes.
+            // The underlying TCP stream could use writev, but TLS frames must be contiguous.
+            for (auto& buf : buffers) {
+                std::size_t total = 0;
+                while (total < buf.size()) {
+                    const auto sent = SSL_write(m_ssl, buf.data() + total, buf.size() - total);
+                    if (sent <= 0)
+                        throw std::runtime_error("hope-io/tls_stream: cannot write to socket");
+                    total += sent;
+                }
+            }
         }
 
         virtual size_t read(void *data, std::size_t length) override {

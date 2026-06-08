@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.11)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -30,6 +30,7 @@ add_executable(hope-io-test
     test_tls.cpp
     test_error_handling.cpp
     test_platform_compatibility.cpp
+    test_write_v.cpp
 )
 
 target_include_directories(hope-io-test PRIVATE ../../lib)
@@ -44,15 +45,14 @@ target_link_libraries(hope-io-test
 # Find OpenSSL for TLS tests
 find_package(OpenSSL)
 if (OPENSSL_FOUND)
-    message("test/ Found openssl, TLS tests are available")
-    target_link_libraries(hope-io-test PRIVATE ${OPENSSL_LIBRARIES})
-    target_include_directories(hope-io-test PRIVATE ${OPENSSL_INCLUDE_DIR})
-    target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
+  message("test/ Found openssl, TLS tests are available")
+  target_link_libraries(hope-io-test PRIVATE ${OPENSSL_LIBRARIES})
+  target_include_directories(hope-io-test PRIVATE ${OPENSSL_INCLUDE_DIR})
+  target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
 else()
-    message("test/ OpenSSL not found, TLS tests will be skipped")
+  message("test/ OpenSSL not found, TLS tests will be skipped")
 endif()
 
 # Add test to CTest
 include(GoogleTest)
 gtest_discover_tests(hope-io-test)
-
