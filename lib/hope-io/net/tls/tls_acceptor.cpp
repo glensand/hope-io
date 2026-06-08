@@ -12,6 +12,7 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
+#include <array>
 
 #ifdef HOPE_IO_USE_OPENSSL
 
@@ -45,7 +46,7 @@ namespace {
 
     class tls_acceptor final : public hope::io::acceptor {
     public:
-        tls_acceptor(std::string_view key, std::string_view cert) 
+        tls_acceptor(std::string_view key, std::string_view cert)
             : m_key(key.data())
             , m_cert(cert.data()) {
             hope::io::init_tls();
@@ -101,7 +102,7 @@ namespace hope::io {
     acceptor* create_tls_acceptor(std::string_view key, std::string_view cert) {
         return new tls_acceptor(key, cert);
     }
-    
+
 }
 
 #else

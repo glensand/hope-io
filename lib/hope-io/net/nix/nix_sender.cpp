@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <string>
 
 namespace {
 
@@ -73,7 +74,7 @@ namespace {
                                          std::string(strerror(errno)));
             }
         }
-        
+
         int m_socket{ 0 };
 
         struct sockaddr_in serv_addr{};
