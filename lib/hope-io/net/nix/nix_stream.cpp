@@ -15,12 +15,14 @@
 #include "hope-io/net/stream.h"
 #include "hope-io/net/factory.h"
 
+#include <array>
 #include <cassert>
 #include <unistd.h>
 #include <cstring>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <time.h>
@@ -107,6 +109,22 @@ namespace {
             }
         }
 
+        virtual void write_v(std::span<const std::span<const char>> buffers) override {
+            if (buffers.empty()) return;
+
+            std::array<iovec, 1024> iovs;
+
+            for (std::size_t i = 0; i < buffers.size(); ++i) {
+                iovs[i] = iovec{const_cast<char*>(buffers[i].data()), buffers[i].size()};
+            }
+
+            auto op_res = writev(m_socket, iovs.data(), static_cast<int>(buffers.size()));
+            if (op_res == -1) {
+                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot write to stream: " +
+                                         std::string(strerror(errno)));
+            }
+        }
+
         virtual size_t read(void* data, std::size_t length) override {
             std::size_t recv_bytes = 0;
             while (recv_bytes != length) {
@@ -146,7 +164,7 @@ namespace {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set read timeout: " +
                                          std::string(strerror(errno)));
             }
-            
+
             int flags = fcntl(m_socket, F_GETFL, 0);
             if (flags == -1) {
                 throw std::runtime_error("hope-io/nix_stream [tcp]: cannot get socket flags: " +

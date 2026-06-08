@@ -34,7 +34,8 @@ cmake-build-debug/
 cmake-build-release/
 Build/
 build/
+build_test/
 *.DS_Store
 .vs/
 .idea/
-
+.zed/

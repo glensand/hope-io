@@ -20,6 +20,7 @@
 #pragma comment (lib, "Mswsock.lib")
 #pragma comment (lib, "AdvApi32.lib")
 
+#include <array>
 #include <stdexcept>
 
 #include "hope-io/net/stream.h"
@@ -156,14 +157,36 @@ namespace {
         }
 
         virtual void write(const void* data, std::size_t length) override {
-            // todo a
-            const auto sent = send(m_socket, (const char*)data, (int)length, 0);
-            if (sent == SOCKET_ERROR) {
-                // TODO use WSAGetLastError
+            if (length == 0) return;
+
+            WSABUF wsa_buf;
+            wsa_buf.buf = const_cast<char*>(static_cast<const char*>(data));
+            wsa_buf.len = static_cast<UINT>(length);
+
+            DWORD bytes_sent = 0;
+            const int res = WSASend(m_socket, &wsa_buf, 1, &bytes_sent, 0, nullptr, nullptr);
+            if (res == SOCKET_ERROR) {
                 throw_error("hope-io/win_stream: Failed to send data", WSAGetLastError());
             }
+        }
 
-            assert(static_cast<std::size_t>(sent) == length);
+        virtual void write_v(std::span<const std::span<const char>> buffers) override {
+            if (buffers.empty()) return;
+
+            // Stack-allocated WSABUF array — zero heap allocation
+            std::array<WSABUF, 1024> wsabufs{};
+
+            for (std::size_t i = 0; i < buffers.size(); ++i) {
+                wsabufs[i].buf = const_cast<char*>(buffers[i].data());
+                wsabufs[i].len = static_cast<UINT>(buffers[i].size());
+            }
+
+            DWORD bytes_sent = 0;
+            const int res = WSASend(m_socket, wsabufs.data(), static_cast<DWORD>(buffers.size()),
+                                    &bytes_sent, 0, nullptr, nullptr);
+            if (res == SOCKET_ERROR) {
+                throw_error("hope-io/win_stream: Failed to send data", WSAGetLastError());
+            }
         }
 
         virtual size_t read(void* data, std::size_t length) override {
