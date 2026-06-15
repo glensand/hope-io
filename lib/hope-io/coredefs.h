@@ -25,6 +25,18 @@
 // TODO:: move to cmake variable
 //#define BUILD_WITH_EASY_PROFILER
 
+// User error — programmer called the API wrong → assert in debug, noop in release
+#define HOPE_ASSERT(cond, msg) assert((cond) && msg)
+
+// System/environment error → always throws with context
+#define HOPE_THROW(component, msg) \
+    throw std::runtime_error(std::string("hope-io/") + component + ": " + msg)
+
+// System error from errno → always throws with errno detail
+#define HOPE_THROW_ERRNO(component, msg) \
+    throw std::runtime_error(std::string("hope-io/") + component + ": " + msg + \
+                             " [errno=" + std::to_string(errno) + " " + strerror(errno) + "]")
+
 #ifdef BUILD_WITH_EASY_PROFILER
 #include <easy/profiler.h>
 #define __STR__(s) #s

@@ -12,10 +12,14 @@
 
 #include "hope-io/net/init.h"
 
+#include <csignal>
+
 namespace hope::io {
 
     void init() {
-
+        // Prevent SIGPIPE from killing the process when send() targets a closed socket.
+        // Without this, write() throws never fire — the process dies silently.
+        signal(SIGPIPE, SIG_IGN);
     }
 
     void deinit() {

@@ -10,6 +10,7 @@
 
 #include "hope-io/net/stream_coro.h"
 #include "hope-io/net/stream.h"
+#include "hope-io/coredefs.h"
 
 namespace hope::io {
 
@@ -17,9 +18,7 @@ namespace hope::io {
     class async_stream {
     public:
         explicit async_stream(stream* str) : m_stream(str) {
-            if (!str) {
-                throw std::runtime_error("hope-io/async_stream: stream pointer is null");
-            }
+            HOPE_ASSERT(str != nullptr, "async_stream: stream pointer is null");
             // Enable non-blocking mode for async operations
             stream_options opts;
             opts.non_block_mode = true;

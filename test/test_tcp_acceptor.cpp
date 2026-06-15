@@ -117,12 +117,8 @@ TEST_F(TcpAcceptorTest, SetOptions) {
     opts.read_timeout = 1000;
     opts.write_timeout = 1000;
     
-    // Should be able to set options before opening
-    ASSERT_NO_THROW(acceptor->set_options(opts));
-    
     acceptor->open(test_port);
     
-    // Should be able to set options after opening
     ASSERT_NO_THROW(acceptor->set_options(opts));
     
     delete acceptor;
@@ -148,8 +144,8 @@ TEST_F(TcpAcceptorTest, OptionsAppliedToAcceptedConnections) {
     opts.write_timeout = 2000;
     opts.non_block_mode = false;
     
-    acceptor->set_options(opts);
     acceptor->open(test_port);
+    acceptor->set_options(opts);
     
     std::thread client_thread([this]() {
         std::this_thread::sleep_for(50ms);
@@ -192,8 +188,8 @@ TEST_F(TcpAcceptorTest, AcceptTimeout) {
     
     hope::io::stream_options opts;
     opts.non_block_mode = true;
-    acceptor->set_options(opts);
     acceptor->open(test_port);
+    acceptor->set_options(opts);
     
     // In non-blocking mode, accept should either return immediately
     // or throw if no connection is available
@@ -249,4 +245,3 @@ TEST_F(TcpAcceptorTest, Cleanup) {
     // Deleting acceptor should clean up resources
     ASSERT_NO_THROW(delete acceptor);
 }
-

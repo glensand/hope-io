@@ -10,6 +10,49 @@
 
 #ifdef HOPE_IO_USE_OPENSSL
 
+#if PLATFORM_LINUX || PLATFORM_APPLE
+#include <sys/select.h>
+#elif PLATFORM_WINDOWS
+#include <winsock2.h>
+#endif
+
+namespace hope::io {
+
+    bool base_tls_stream::wait_for_ssl(int ssl_error, int timeout_ms) {
+        auto fd = m_tcp_stream->platform_socket();
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+
+        struct timeval tv;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+        int ret;
+        if (ssl_error == SSL_ERROR_WANT_READ) {
+            ret = select(fd + 1, &fds, nullptr, nullptr, &tv);
+        } else {
+            ret = select(fd + 1, nullptr, &fds, nullptr, &tv);
+        }
+        return ret > 0;
+    }
+
+    void base_tls_stream::handle_ssl_error(const char* op, int result) {
+        auto err = SSL_get_error(m_ssl, result);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            // Non-fatal: the underlying socket is not ready.
+            // Poll with a short timeout to avoid busy-waiting.
+            wait_for_ssl(err, 10);
+            return;
+        }
+        if (err == SSL_ERROR_ZERO_RETURN) {
+            HOPE_THROW("tls_stream", std::string(op) + ": connection closed by peer");
+        }
+        HOPE_THROW("tls_stream", std::string(op) + " failed: SSL_get_error=" + std::to_string(err));
+    }
+
+}
+
 namespace {
 
     class client_tls_stream final : public hope::io::base_tls_stream {

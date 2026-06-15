@@ -84,44 +84,8 @@ TEST_F(PlatformCompatibilityTest, StreamBehavior) {
     delete acceptor;
 }
 
-// Test Windows-specific behavior: set_options before connect
-TEST_F(PlatformCompatibilityTest, WindowsSetOptionsBeforeConnect) {
-#if PLATFORM_WINDOWS
-    auto* stream = hope::io::create_stream();
-
-    hope::io::stream_options opts;
-    opts.connection_timeout = 1000;
-
-    // On Windows, set_options should work before connect
-    ASSERT_NO_THROW(stream->set_options(opts));
-
-    // But should throw if called after connect
-    auto* acceptor = hope::io::create_acceptor();
-    acceptor->open(test_port);
-
-    std::thread server_thread([&acceptor]() {
-        auto* conn = acceptor->accept();
-        delete conn;
-    });
-
-    std::this_thread::sleep_for(50ms);
-
-    stream->connect("127.0.0.1", test_port);
-
-    // On Windows, this should throw
-    EXPECT_THROW(stream->set_options(opts), std::exception);
-
-    stream->disconnect();
-    delete stream;
-
-    server_thread.join();
-    delete acceptor;
-#endif
-}
-
-// Test Unix-specific behavior: set_options after connect
-TEST_F(PlatformCompatibilityTest, UnixSetOptionsAfterConnect) {
-#if PLATFORM_LINUX || PLATFORM_APPLE
+// Test that set_options works after connect (cross-platform)
+TEST_F(PlatformCompatibilityTest, SetOptionsAfterConnect) {
     auto* acceptor = hope::io::create_acceptor();
     acceptor->open(test_port);
 
@@ -139,7 +103,7 @@ TEST_F(PlatformCompatibilityTest, UnixSetOptionsAfterConnect) {
     opts.read_timeout = 1000;
     opts.write_timeout = 1000;
 
-    // On Unix, set_options should work after connect
+    // set_options requires a connected socket
     ASSERT_NO_THROW(client->set_options(opts));
 
     client->disconnect();
@@ -147,7 +111,6 @@ TEST_F(PlatformCompatibilityTest, UnixSetOptionsAfterConnect) {
 
     server_thread.join();
     delete acceptor;
-#endif
 }
 
 // Test Windows read() return value bug

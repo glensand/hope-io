@@ -99,7 +99,7 @@ namespace hope::io {
                 listen(m_listen_socket, cfg.max_mutual_connections);
             
                 m_epfd = epoll_create(1);
-                epoll_ctl_add(m_epfd, m_listen_socket, EPOLLIN | EPOLLOUT | EPOLLET);
+                epoll_ctl_add(m_epfd, m_listen_socket, EPOLLIN | EPOLLOUT | EPOLLET, cb);
 
                 m_pl.prepool(cfg.max_mutual_connections);
                 m_events.resize(cfg.max_mutual_connections);
@@ -157,7 +157,7 @@ namespace hope::io {
                     }
                     if (sock != -1) {
                         push_new_connection(sock);
-                        epoll_ctl_add(m_epfd, sock, EPOLLRDHUP | EPOLLHUP | EPOLLET);
+                        epoll_ctl_add(m_epfd, sock, EPOLLRDHUP | EPOLLHUP | EPOLLET, cb);
                         cb.on_connect(m_connections[sock]);
                     }
                 }
@@ -216,13 +216,14 @@ namespace hope::io {
                 }
             }
 
-            void epoll_ctl_add(int32_t epfd, int32_t fd, uint32_t events) {
-	            epoll_event ev;
-	            ev.events = events;
-	            ev.data.fd = fd;
-	            if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
-		            // todo:: cb
-	            }
+            void epoll_ctl_add(int32_t epfd, int32_t fd, uint32_t events, callbacks& cb) {
+                epoll_event ev;
+                ev.events = events;
+                ev.data.fd = fd;
+                if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+                    connection dumb;
+                    cb.on_err(dumb, std::string("epoll_ctl ADD failed: ") + strerror(errno));
+                }
             }
 
             void remove_connection(int32_t descriptor) {

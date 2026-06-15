@@ -63,10 +63,16 @@ namespace {
             return (int32_t)m_socket;
         }
 
+        // NOTE: set_options() must be called after connect(). Options are applied
+        // immediately to the connected socket. Calling before connect() is a no-op.
         virtual void set_options(const hope::io::stream_options& options) override {
-            if (m_socket != INVALID_SOCKET)
-                throw_error("hope-io/win_stream: cannot set options when the socket is connected:", WSAGetLastError());
-            m_options = options;
+            if (m_socket == INVALID_SOCKET) {
+                return;
+            }
+            setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO,
+                       (const char*)&options.read_timeout, sizeof(options.read_timeout));
+            setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO,
+                       (const char*)&options.write_timeout, sizeof(options.write_timeout));
         }
 
         virtual void connect(const std::string_view ip, std::size_t port) override {
@@ -112,8 +118,6 @@ namespace {
                     } else {
                         int on = 1;
                         int error = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
-                        error |= setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&m_options.read_timeout, sizeof(m_options.read_timeout));
-                        error |= setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&m_options.write_timeout, sizeof(m_options.write_timeout));
                         if (error == NO_ERROR) {
                             error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
                             if (WSAGetLastError() == WSAEWOULDBLOCK) {
@@ -127,8 +131,8 @@ namespace {
                                 FD_SET(m_socket, &err);
 
                                 TIMEVAL timeout;
-                                timeout.tv_sec = m_options.connection_timeout / 1000;
-                                timeout.tv_usec = m_options.connection_timeout - timeout.tv_sec * 1000;
+                                timeout.tv_sec = 3;
+                                timeout.tv_usec = 0;
                                 // check if the socket is ready
                                 select(0, NULL, &write, &err, &timeout);			
                                 if(!FD_ISSET(m_socket, &write)) {
@@ -217,7 +221,6 @@ namespace {
         }
 
         SOCKET m_socket{ INVALID_SOCKET };
-        hope::io::stream_options m_options;
     };
 
 }

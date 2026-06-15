@@ -25,6 +25,7 @@
 #include <sys/uio.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <poll.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -34,6 +35,7 @@ namespace {
     public:
         explicit nix_stream(unsigned long long in_socket) {
             // Default from create_stream(): unconnected stream. Must not use 0 — fd 0 is stdin.
+            HOPE_ASSERT(in_socket != 0, "nix_stream: fd 0 is stdin, not a network socket");
             if (in_socket == static_cast<unsigned long long>(-1)) {
                 m_socket = -1;
             } else {
@@ -59,6 +61,7 @@ namespace {
         }
 
         virtual void connect(const std::string_view ip, std::size_t port) override {
+            HOPE_ASSERT(m_socket == -1, "nix_stream: connect() called without prior disconnect()");
             struct addrinfo hints{};
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
@@ -66,8 +69,7 @@ namespace {
             struct addrinfo* res;
             int err = getaddrinfo(ip.data(), nullptr, &hints, &res);
             if (err != 0) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot resolve ip: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot resolve ip");
             }
 
             struct sockaddr_in serv_addr{};
@@ -80,14 +82,12 @@ namespace {
             freeaddrinfo(res);
 
             if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot create socket: " +
-                                         std::string(strerror(errno)));
-	        }
+                HOPE_THROW_ERRNO("nix_stream", "cannot create socket");
+            }
 
-	        if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot connect to host: " +
-                                         std::string(strerror(errno)));
-	        }
+            if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
+                HOPE_THROW_ERRNO("nix_stream", "cannot connect to host");
+            }
         }
 
         virtual void disconnect() override {
@@ -101,9 +101,8 @@ namespace {
             std::size_t bytes_sent = 0;
             while (bytes_sent != length) {
                 auto op_res = send(m_socket, (char*)data + bytes_sent, length - bytes_sent, 0);
-                if (op_res == -1){
-                    throw std::runtime_error("hope-io/nix_stream [tcp]: cannot write to stream: " +
-                                         std::string(strerror(errno)));
+                if (op_res == -1) {
+                    HOPE_THROW_ERRNO("nix_stream", "cannot write to stream");
                 }
                 bytes_sent += op_res;
             }
@@ -120,8 +119,7 @@ namespace {
 
             auto op_res = writev(m_socket, iovs.data(), static_cast<int>(buffers.size()));
             if (op_res == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot write to stream: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot writev to stream");
             }
         }
 
@@ -130,8 +128,10 @@ namespace {
             while (recv_bytes != length) {
                 auto op_res = recv(m_socket, (char*)data + recv_bytes, length - recv_bytes, 0);
                 if (op_res == -1) {
-                    throw std::runtime_error("hope-io/nix_stream [tcp]: cannot read from stream: " +
-                                         std::string(strerror(errno)));
+                    HOPE_THROW_ERRNO("nix_stream", "cannot read from stream");
+                }
+                if (op_res == 0) {
+                    HOPE_THROW("nix_stream", "connection closed by peer");
                 }
                 recv_bytes += op_res;
             }
@@ -147,34 +147,28 @@ namespace {
         }
 
         virtual void set_options(const hope::io::stream_options& opt) override {
-            if (m_socket < 0) {
-                return;
-            }
+            HOPE_ASSERT(m_socket >= 0, "nix_stream: set_options() called before connect()");
             struct timeval timeout;
             timeout.tv_sec = opt.write_timeout / 1000;
             timeout.tv_usec = 1000 * (opt.write_timeout - timeout.tv_sec * 1000);
             if (setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set write timeout: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot set write timeout");
             }
 
             timeout.tv_sec = opt.read_timeout / 1000;
             timeout.tv_usec = 1000 * (opt.read_timeout - timeout.tv_sec * 1000);
             if (setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set read timeout: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot set read timeout");
             }
 
             int flags = fcntl(m_socket, F_GETFL, 0);
             if (flags == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot get socket flags: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot get socket flags");
             }
 
             flags = opt.non_block_mode ? flags | O_NONBLOCK : flags & (~O_NONBLOCK);
             if (fcntl(m_socket, F_SETFL, flags) == -1) {
-                throw std::runtime_error("hope-io/nix_stream [tcp]: cannot set non-block flag: " +
-                                         std::string(strerror(errno)));
+                HOPE_THROW_ERRNO("nix_stream", "cannot set non-block flag");
             }
         }
 
