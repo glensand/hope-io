@@ -25,7 +25,7 @@ void on_connect(hope::io::event_loop::connection& c) {
 
 void on_read(hope::io::event_loop::connection& c) {
     NAMED_SCOPE(OnRead);
-    const auto local_data = c.buffer->used_chunk();
+    const auto local_data = c.buffer->peek_used();
     const auto message_length = local_data.second;
     if (message_length >= sizeof(uint32_t)) {
         // if we have enought data, lets try to read it
@@ -36,8 +36,8 @@ void on_read(hope::io::event_loop::connection& c) {
             const char* p_text = ((char*)local_data.first + sizeof(uint32_t));
             std::string_view text(p_text, string_length);
             c.buffer->reset();
-            // set buffer pointer to read pos to echo msg
-            c.buffer->handle_write(local_data.second);
+            // write the message back for echo
+            c.buffer->write(local_data.first, local_data.second);
             c.set_state(hope::io::event_loop::connection_state::write);
         } 
     }

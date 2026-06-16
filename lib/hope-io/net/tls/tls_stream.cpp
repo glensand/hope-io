@@ -55,17 +55,38 @@ namespace hope::io {
 
 namespace {
 
+    // Shared SSL_CTX for all client connections — avoids per-connect SSL_CTX_new() allocation.
+    // Constructed once (thread-safe static local init in C++20).
+    // Includes session caching for faster reconnects.
+    ssl_ctx_st* get_shared_client_context() {
+        static ssl_ctx_st* ctx = [] {
+            auto* method = TLS_client_method();
+            auto* c = SSL_CTX_new(method);
+            if (c) {
+                // Enable session caching on the client side.
+                // When reconnecting to the same host, this skips the asymmetric-key handshake.
+                SSL_CTX_set_session_cache_mode(c,
+                    SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
+                SSL_CTX_sess_set_cache_size(c, 128);
+            }
+            return c;
+        }();
+        return ctx;
+    }
+
     class client_tls_stream final : public hope::io::base_tls_stream {
     public:
         using base_tls_stream::base_tls_stream;
 
         virtual void connect(std::string_view ip, std::size_t port) override {
             m_tcp_stream->connect(ip, port);
-            auto* context_method = TLS_client_method();
-            m_context = SSL_CTX_new(context_method);
+
+            // Use the shared context — no per-connect SSL_CTX_new() allocation.
+            m_context = get_shared_client_context();
             if (m_context == nullptr) {
                 throw std::runtime_error("hope-io/client_tls_stream: cannot create context");
             }
+
             m_ssl = SSL_new(m_context);
             SSL_set_fd(m_ssl, (int32_t)m_tcp_stream->platform_socket());
 
@@ -79,7 +100,8 @@ namespace {
 
         virtual void disconnect() override {
             base_tls_stream::disconnect();
-            SSL_CTX_free(m_context);
+            // m_context is the shared global — do NOT SSL_CTX_free() it.
+            m_context = nullptr;
         }
     };
 

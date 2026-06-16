@@ -20,10 +20,12 @@
 #include <atomic>
 
 #include <fcntl.h>
-#include <poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/event.h>
+#include <sys/time.h>
 #include <netinet/ip.h>
 
 namespace hope::io {
@@ -65,8 +67,6 @@ namespace hope::io {
 
             virtual void run(const config& cfg, callbacks&& cb) override {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
-                //NAMED_SCOPE(Process);
-                // TODO:: multiport option?
                 if (cfg.custom_acceptor != nullptr) {
                     m_acceptor = cfg.custom_acceptor;
                     m_owns_acceptor = false;
@@ -78,91 +78,80 @@ namespace hope::io {
                 stream_options opt;
                 opt.non_block_mode = true;
                 m_acceptor->set_options(opt);
+                m_cfg = cfg;
+
+                m_kq = kqueue();
+                if (m_kq == -1) {
+                    connection dumb;
+                    cb.on_err(dumb, "kqueue() failed");
+                    return;
+                }
+
+                // Register listen socket
+                struct kevent ev;
+                EV_SET(&ev, (uint64_t)m_acceptor->raw(), EVFILT_READ, EV_ADD, 0, 0, nullptr);
+                if (kevent(m_kq, &ev, 1, nullptr, 0, nullptr) == -1) {
+                    connection dumb;
+                    cb.on_err(dumb, "kevent: cannot register listen socket");
+                    return;
+                }
+
+                m_events.resize(cfg.max_mutual_connections);
 
                 while (m_running.load(std::memory_order_acquire)) {
                     NAMED_SCOPE(Tick);
-                    m_poll_args.clear();
-                    pollfd descriptor{ (int)m_acceptor->raw(), POLLIN, 0 };
-                    m_poll_args.emplace_back(descriptor);
+                    struct timespec timeout;
+                    timeout.tv_sec = 1;
+                    timeout.tv_nsec = 0;
+
+                    int nfds;
                     {
-                        NAMED_SCOPE(FillConnections);
-                        // fill active connections
-                        for (auto&& it = begin(m_connections); it != end(m_connections);) {
-                            // TODO:: maybe better to use bit flags and allow read and write at the same socket at the same time?
-                            // NOTE:: read flag here, to ensure everything gonna be ok if someone will change state while if-else
-                            auto pending_state = it->get_state();
-                            if (pending_state == connection_state::die) {
-                                ::close(it->descriptor);
-                                it = m_connections.erase(it);
-                                // connections.erase
-                            }
-                            else {
-                                struct pollfd pfd = { it->descriptor, POLLERR, 0 };
-                                if (pending_state == connection_state::read) {
-                                    pfd.events |= POLLIN;
-                                } 
-                                else if (pending_state == connection_state::write) {
-                                    pfd.events |= POLLOUT;
-                                }
-                                else {
-                                    assert(false && "invalid state, state should be read|write|die");
-                                }
-                                m_poll_args.emplace_back(pfd);
-                                ++it;
-                            }
-                        }
+                        NAMED_SCOPE(Kevent);
+                        nfds = kevent(m_kq, nullptr, 0, m_events.data(), (int)m_events.size(), &timeout);
                     }
-                    
-                    int rv;
-                    {
-                        NAMED_SCOPE(Poll);
-                        rv = poll(m_poll_args.data(), (nfds_t)m_poll_args.size(), 1000);
-                    }
-                    if (rv < 0 && errno != EINTR) {
-                        // Ok here we have error
-                        // since run() can be executed from worker thread, we will not thtow exception here
-                        // instead we will just call cb to notify
+                    if (nfds < 0) {
                         connection dumb;
-                        cb.on_err(dumb, "");
+                        cb.on_err(dumb, "kevent() failed");
                         m_running = false;
-                    } else if (rv > 0){
-                        // listen socket is in first arg
-                        if (m_poll_args[0].revents) {
-                           handle_accept(cb);
-                        }
-
-                        for (std::size_t i = 1; i < m_poll_args.size(); ++i) {
-                            uint32_t ready = m_poll_args[i].revents;
-                            if (ready != 0) {
-                                auto descriptor = m_poll_args[i].fd;
-                                auto&& conn = (connection&)(*m_connections.find(descriptor));
-                                if (ready & POLLIN) {
-                                    handle_read(conn, cb);
-                                }
-                                if (ready & POLLOUT) {
-                                    handle_write(conn, cb);
-                                }
-
-                                // close the socket from socket error or application logic
-                                if ((ready & POLLERR) || conn.get_state() == connection_state::die) {
-                                    if (ready & POLLERR) {
-                                        cb.on_err(conn, "an error occuried on specified socket, closing the connection");
-                                    }
-                                    (void)close(conn.descriptor);
+                    } else {
+                        for (int i = 0; i < nfds; ++i) {
+                            auto& event = m_events[i];
+                            auto fd = (int)event.ident;
+                            if (event.flags & EV_EOF) {
+                                // Connection closed
+                                auto it = m_connections.find(fd);
+                                if (it != m_connections.end()) {
+                                    auto& conn = (connection&)*it;
+                                    ::close(fd);
                                     if (conn.buffer) {
                                         m_pl.redeem(conn.buffer);
                                     }
-                                    m_connections.erase(m_poll_args[i].fd);
+                                    m_connections.erase(fd);
+                                }
+                            } else if (fd == m_acceptor->raw()) {
+                                handle_accept(cb);
+                            } else if (event.filter == EVFILT_READ) {
+                                auto it = m_connections.find(fd);
+                                if (it != m_connections.end()) {
+                                    handle_read((connection&)*it, cb);
+                                }
+                            } else if (event.filter == EVFILT_WRITE) {
+                                auto it = m_connections.find(fd);
+                                if (it != m_connections.end()) {
+                                    handle_write((connection&)*it, cb);
                                 }
                             }
                         }
                     }
-
                 }
             }
 
             virtual void stop() override {
                 m_running = false;
+                if (m_kq != -1) {
+                    close(m_kq);
+                    m_kq = -1;
+                }
                 if (m_owns_acceptor && m_acceptor != nullptr) {
                     delete m_acceptor;
                     m_acceptor = nullptr;
@@ -178,19 +167,26 @@ namespace hope::io {
                     int sock = accept(m_acceptor->raw(), (struct sockaddr *)&client_addr, &socklen);
                     int flags = fcntl(sock, F_GETFL, 0);
                     if (flags == -1) {
-                        // TODO:: do I need to handle any error here? Or just break if any
                         break;
                     } else {
                         flags = flags | O_NONBLOCK;
                         if (fcntl(sock, F_SETFL, flags) == -1) {
                             connection dumb{ -1 };
-                            // TODO:: add adress to message
                             cb.on_err(dumb, "Cannot set flags for connection, skip this one");
                             ::close(sock);
                             sock = -1;
                         }
                     }
                     if (sock != -1) {
+                        // Register with kqueue
+                        struct kevent ev;
+                        EV_SET(&ev, sock, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+                        if (kevent(m_kq, &ev, 1, nullptr, 0, nullptr) == -1) {
+                            connection dumb{ -1 };
+                            cb.on_err(dumb, "kevent: cannot register new connection");
+                            ::close(sock);
+                            continue;
+                        }
                         auto&& conn = (connection&)*m_connections.emplace(sock).first;
                         conn.buffer = m_pl.allocate();
                         cb.on_connect(conn);
@@ -200,59 +196,52 @@ namespace hope::io {
 
             void handle_read(connection& conn, callbacks& cb) {
                 NAMED_SCOPE(HandleRead);
-                // probably we do not need to assert state here, we just need to check for read
-                // perform actual reed and check one more time?
                 assert(conn.get_state() == connection_state::read);
-                // out buffer is limited in size and might be smaller then OS buffer
-                // try to read untill failure(yep, not a best way because of syscalls)
-                // may be we need to introduce settings for buffer size
-                bool read = true;
-                while (read) {
-                    const auto span = conn.buffer->free_chunk();
-                    auto received = ::recv(conn.descriptor, (char*)span.first, span.second, 0);
+
+                bool error = false;
+                std::size_t total_received = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                    auto received = ::recv(conn.descriptor, (char*)data, size, 0);
                     if (received <= 0 && errno != EAGAIN) {
                         cb.on_err(conn, "Cannot read from socket, close connection");
                         conn.set_state(connection_state::die);
-                        read = false;
-                    } else if (received <= 0 && errno == EAGAIN) {
-                        // not an error, nothing to do here
-                        read = false;
-                    } else {
-                        conn.buffer->handle_write(received);
-                        cb.on_read(conn);
-                        conn.buffer->shrink();
-                        assert(conn.buffer->free_space() != 0);
-                        assert(received > 0);
-
-                        // if the application does not handle buffer, or we received less data
-                        // then we can obtain, will try at the next time
-                        if ((size_t)received < span.second || conn.get_state() != connection_state::read) {
-                            read = false;
-                        }
+                        error = true;
+                        return size; // advance past all to stop
+                    } else if (received <= 0) {
+                        return 0; // EAGAIN, don't advance
                     }
+                    total_received += received;
+                    return (std::size_t)received;
+                });
+
+                if (total_received > 0 && !error) {
+                    cb.on_read(conn);
                 }
             }
 
             void handle_write(connection& conn, callbacks& cb) {
                 NAMED_SCOPE(HandleWrite);
                 assert(conn.get_state() == connection_state::write);
-                const auto span = conn.buffer->used_chunk();
-                auto op_res = send(conn.descriptor, (char*)span.first, span.second, 0);
-                if (op_res <= 0 && errno != EAGAIN) {
-                    cb.on_err(conn, "Cannot write to socket, close connection");
-                    conn.set_state(connection_state::die);
-                } else if (op_res > 0) {
-                    conn.buffer->handle_read(op_res);
-                    conn.buffer->shrink();
-                    assert((conn.buffer->count() == 0) == conn.buffer->is_empty());
-                    if (conn.buffer->is_empty()) {
-                        cb.on_write(conn);
+
+                conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                    auto op_res = send(conn.descriptor, (char*)data, size, 0);
+                    if (op_res <= 0 && errno != EAGAIN) {
+                        cb.on_err(conn, "Cannot write to socket, close connection");
+                        conn.set_state(connection_state::die);
+                        return size; // advance past all to stop
+                    } else if (op_res <= 0) {
+                        return 0; // EAGAIN
                     }
+                    return (std::size_t)op_res;
+                });
+
+                if (conn.buffer->is_empty()) {
+                    cb.on_write(conn);
                 }
             }
 
             std::unordered_set<connection, connection::hash> m_connections;
-            std::vector<struct pollfd> m_poll_args;
+            int m_kq = -1;
+            std::vector<struct kevent> m_events;
 
             config m_cfg;
             buffer_pool m_pl;

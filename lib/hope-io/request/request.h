@@ -30,7 +30,7 @@ namespace hope::io::http {
     };
 
     inline url_t extract_url(const std::string& url) {
-        std::regex url_regex(
+        static const std::regex url_regex(
             R"((https?)://([^:/]+)(?::(\d+))?(/?[^?#]*)?)",
             std::regex_constants::icase
         );

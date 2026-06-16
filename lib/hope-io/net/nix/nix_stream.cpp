@@ -112,14 +112,32 @@ namespace {
             if (buffers.empty()) return;
 
             std::array<iovec, 1024> iovs;
-
-            for (std::size_t i = 0; i < buffers.size(); ++i) {
+            std::size_t total = 0;
+            auto count = buffers.size();
+            for (auto i = 0u; i < count; ++i) {
                 iovs[i] = iovec{const_cast<char*>(buffers[i].data()), buffers[i].size()};
+                total += buffers[i].size();
             }
 
-            auto op_res = writev(m_socket, iovs.data(), static_cast<int>(buffers.size()));
+            // Single syscall — this is the whole point of write_v.
+            auto op_res = writev(m_socket, iovs.data(), (int)count);
             if (op_res == -1) {
                 HOPE_THROW_ERRNO("nix_stream", "cannot writev to stream");
+            }
+
+            // Partial write is rare (EINTR or non-blocking).
+            // Fall back to sequential write() for the remainder.
+            auto written = (std::size_t)op_res;
+            if (written < total) {
+                std::size_t skip = written;
+                for (auto i = 0u; i < count; ++i) {
+                    if (skip >= buffers[i].size()) {
+                        skip -= buffers[i].size();
+                        continue;
+                    }
+                    write(buffers[i].data() + skip, buffers[i].size() - skip);
+                    skip = 0;
+                }
             }
         }
 

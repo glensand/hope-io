@@ -20,7 +20,6 @@ namespace hope::io {
     // TLS stuff
     class acceptor* create_tls_acceptor(std::string_view key, std::string_view cert);
     class stream* create_tls_stream(stream* tcp_stream = nullptr);
-    class stream* create_tls_websockets_stream(stream* tcp_stream = nullptr);
 
     // UDP stuff
     class udp_receiver* create_udp_receiver(unsigned long long socket = 0);

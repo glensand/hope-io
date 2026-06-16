@@ -165,54 +165,47 @@ namespace hope::io {
 
             void handle_read(connection& conn, callbacks& cb) {
                 NAMED_SCOPE(HandleRead);
-                // probably we do not need to assert state here, we just need to check for read
-                // perform actual reed and check one more time?
                 assert(conn.get_state() == connection_state::read);
-                // out buffer is limited in size and might be smaller then OS buffer
-                // try to read untill failure(yep, not a best way because of syscalls)
-                // may be we need to introduce settings for buffer size
-                bool read = true;
-                while (read) {
-                    const auto span = conn.buffer->free_chunk();
-                    auto received = ::recv(conn.descriptor, (char*)span.first, span.second, 0);
+
+                bool error = false;
+                std::size_t total_received = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                    auto received = ::recv(conn.descriptor, (char*)data, size, 0);
                     if (received <= 0 && errno != EAGAIN) {
                         cb.on_err(conn, "Cannot read from socket, close connection");
                         conn.set_state(connection_state::die);
-                        read = false;
-                    } else if (received <= 0 && errno == EAGAIN) {
-                        // not an error, nothing to do here
-                        read = false;
-                    } else {
-                        conn.buffer->handle_write(received);
-                        cb.on_read(conn);
-                        conn.buffer->shrink();
-                        assert(conn.buffer->free_space() != 0);
-                        assert(received > 0);
-                                            
-                        // if the application does not handle buffer, or we received less data
-                        // then we can obtain, will try at the next time
-                        if ((size_t)received < span.second || conn.get_state() != connection_state::read) {
-                            read = false;
-                        }
+                        error = true;
+                        return size; // advance past all to stop
+                    } else if (received <= 0) {
+                        return 0; // EAGAIN, don't advance
                     }
+                    total_received += received;
+                    return (std::size_t)received;
+                });
+
+                // Fire callback once per tick with all accumulated data
+                if (total_received > 0 && !error) {
+                    cb.on_read(conn);
                 }
             }
 
             void handle_write(connection& conn, callbacks& cb) {
                 NAMED_SCOPE(HandleWrite);
                 assert(conn.get_state() == connection_state::write);
-                const auto span = conn.buffer->used_chunk();
-                auto op_res = send(conn.descriptor, (char*)span.first, span.second, 0);
-                if (op_res <= 0 && errno != EAGAIN) {
-                    cb.on_err(conn, "Cannot write to socket, close connection");
-                    conn.set_state(connection_state::die);
-                } else if (op_res > 0) {
-                    conn.buffer->handle_read(op_res);
-                    conn.buffer->shrink();
-                    assert((conn.buffer->count() == 0) == conn.buffer->is_empty());
-                    if (conn.buffer->is_empty()) {
-                        cb.on_write(conn);
+
+                conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                    auto op_res = send(conn.descriptor, (char*)data, size, 0);
+                    if (op_res <= 0 && errno != EAGAIN) {
+                        cb.on_err(conn, "Cannot write to socket, close connection");
+                        conn.set_state(connection_state::die);
+                        return size; // advance past all to stop
+                    } else if (op_res <= 0) {
+                        return 0; // EAGAIN
                     }
+                    return (std::size_t)op_res;
+                });
+
+                if (conn.buffer->is_empty()) {
+                    cb.on_write(conn);
                 }
             }
 

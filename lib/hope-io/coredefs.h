@@ -45,7 +45,6 @@
 #define PROFILER_INIT EASY_PROFILER_ENABLE
 #define PROFILER_START_LISTEN profiler::startListen();
 #else
-#define __STR__(s)
 #define THREAD_SCOPE(ThreadName)
 #define NAMED_SCOPE(Name)
 #define PROFILER_INIT

@@ -10,42 +10,26 @@
 
 #ifdef HOPE_IO_USE_OPENSSL
 #include "openssl/ssl.h"
-#include "openssl/err.h"
 #endif
 
-#include <mutex>
 #include <cassert>
 
 namespace hope::io {
 
-    static std::mutex tls_guard;
-    static int tls_initialized = 0;
-    
     void init_tls() {
 #ifdef HOPE_IO_USE_OPENSSL
-        std::lock_guard lock(tls_guard);
-        if (tls_initialized == 0){
-            SSL_library_init();
-	        SSL_load_error_strings();
-	        OpenSSL_add_all_algorithms();
-        }
-        ++tls_initialized;
+        // OPENSSL_init_ssl() is idempotent and thread-safe on OpenSSL >= 1.1.0.
+        // It replaces the deprecated SSL_library_init() / SSL_load_error_strings() / OpenSSL_add_all_algorithms().
+        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, nullptr);
 #else
         assert(false && "hope-io/ OpenSSL is not available");
 #endif
     }
 
     void deinit_tls() {
-#ifdef HOPE_IO_USE_OPENSSL
-        std::lock_guard lock(tls_guard);
-        --tls_initialized;
-        if (tls_initialized == 0){
-            ERR_free_strings();
-	        EVP_cleanup();
-        }
-#else
-        assert(false && "hope-io/ OpenSSL is not available");
-#endif
+        // OpenSSL >= 1.1.0 auto-cleans via atexit.
+        // Explicit cleanup (OPENSSL_cleanup) is unsafe with multiple callers.
+        // Keep as no-op for API compatibility.
     }
 
 }

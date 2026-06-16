@@ -203,9 +203,7 @@ TEST_F(EventLoopTest, BufferShrink) {
     char read_buffer[10] = {0};
     buffer.read(read_buffer, 5);
     
-    // Shrink should move remaining data to start
-    buffer.shrink();
-    
+    // Ring buffer handles wrap naturally — no compaction needed.
     EXPECT_EQ(buffer.count(), test_data.length() - 5);
 }
 
