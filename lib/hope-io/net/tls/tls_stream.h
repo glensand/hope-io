@@ -82,17 +82,27 @@ namespace hope::io {
         }
 
         virtual void write_v(std::span<const std::span<const char>> buffers) override {
-            // OpenSSL SSL_write takes a single buffer, so we fall back to sequential writes.
-            // The underlying TCP stream could use writev, but TLS frames must be contiguous.
-            for (auto& buf : buffers) {
-                std::size_t total = 0;
-                while (total < buf.size()) {
-                    const auto sent = SSL_write(m_ssl, buf.data() + total, buf.size() - total);
-                    if (sent > 0) {
-                        total += sent;
-                    } else {
-                        handle_ssl_error("SSL_write", sent);
-                    }
+            // SSL_write takes a single contiguous buffer, so gather fragments first.
+            // One SSL_write = one TLS record = one send() syscall vs N.
+            std::size_t total_size = 0;
+            for (auto& buf : buffers) total_size += buf.size();
+
+            if (total_size == 0) return;
+
+            // std::string is guaranteed contiguous, already included via stream.h
+            std::string gathered;
+            gathered.reserve(total_size);
+            for (auto& buf : buffers)
+                gathered.append(buf.data(), buf.size());
+
+            std::size_t written = 0;
+            while (written < total_size) {
+                const auto sent = SSL_write(m_ssl, gathered.data() + written,
+                                            total_size - written);
+                if (sent > 0) {
+                    written += sent;
+                } else {
+                    handle_ssl_error("SSL_write", sent);
                 }
             }
         }
