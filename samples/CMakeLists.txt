@@ -18,6 +18,15 @@ foreach(source ${SAMPLE_CORE_SOURCES})
 
     target_include_directories(${target_name} PUBLIC ../../lib)
 
+    # Platform definitions (must match lib/CMakeLists.txt)
+    if(UNIX AND NOT APPLE)
+        target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=1 PLATFORM_APPLE=0 PLATFORM_WINDOWS=0)
+    elseif(APPLE)
+        target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=0 PLATFORM_APPLE=1 PLATFORM_WINDOWS=0)
+    else()
+        target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=0 PLATFORM_APPLE=0 PLATFORM_WINDOWS=1)
+    endif()
+
     if (OPENSSL_FOUND)
         message("sample/ Found openssl, tls features are available")
 

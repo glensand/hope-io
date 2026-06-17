@@ -33,7 +33,7 @@ namespace hope::io {
         // Check if stream is ready for I/O without blocking
         static bool check_ready(int32_t socket, mode m, int timeout_ms = 0) noexcept {
 #if PLATFORM_LINUX || PLATFORM_APPLE
-            struct pollfd pfd = {socket, m == mode::read ? POLLIN : POLLOUT, 0};
+            struct pollfd pfd = {socket, (short)(m == mode::read ? POLLIN : POLLOUT), 0};
             int result = poll(&pfd, 1, timeout_ms);
             return result > 0 && (pfd.revents & (m == mode::read ? POLLIN : POLLOUT));
 #elif PLATFORM_WINDOWS

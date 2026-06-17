@@ -35,8 +35,23 @@ namespace hope::io {
     event_loop* create_event_loop() {
         class event_loop_impl final : public event_loop {
         public:
-            event_loop_impl() = default;
-            ~event_loop_impl() override = default;
+            event_loop_impl() {
+                // Add/remove EVFILT_WRITE on state transitions.
+                // die is handled in the main loop after read/write handlers.
+                event_loop::connection::on_state_changed = [this](const event_loop::connection& conn) {
+                    struct kevent ev;
+                    if (conn.get_state() == event_loop::connection_state::write) {
+                        EV_SET(&ev, conn.descriptor, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
+                        kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
+                    } else if (conn.get_state() == event_loop::connection_state::read) {
+                        EV_SET(&ev, conn.descriptor, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+                        kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
+                    }
+                };
+            }
+            ~event_loop_impl() override {
+                event_loop::connection::on_state_changed = nullptr;
+            }
 
         private:
             struct buffer_pool final {
@@ -64,6 +79,18 @@ namespace hope::io {
             private:
                 std::deque<fixed_size_buffer*> m_impl; // prepool?
             };
+
+            void do_remove_connection(int32_t fd) {
+                auto it = m_connections.find(fd);
+                if (it != m_connections.end()) {
+                    auto& conn = (connection&)*it;
+                    ::close(fd);
+                    if (conn.buffer) {
+                        m_pl.redeem(conn.buffer);
+                    }
+                    m_connections.erase(fd);
+                }
+            }
 
             virtual void run(const config& cfg, callbacks&& cb) override {
                 THREAD_SCOPE(EVENT_LOOP_THREAD);
@@ -134,11 +161,15 @@ namespace hope::io {
                                 auto it = m_connections.find(fd);
                                 if (it != m_connections.end()) {
                                     handle_read((connection&)*it, cb);
+                                    if (it->get_state() == connection_state::die)
+                                        do_remove_connection(fd);
                                 }
                             } else if (event.filter == EVFILT_WRITE) {
                                 auto it = m_connections.find(fd);
                                 if (it != m_connections.end()) {
                                     handle_write((connection&)*it, cb);
+                                    if (it->get_state() == connection_state::die)
+                                        do_remove_connection(fd);
                                 }
                             }
                         }

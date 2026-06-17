@@ -28,6 +28,7 @@ add_executable(hope-io-test
     test_udp.cpp
     test_event_loop.cpp
     test_tls.cpp
+    test_tls_event_loop.cpp
     test_error_handling.cpp
     test_platform_compatibility.cpp
     test_write_v.cpp
@@ -51,6 +52,15 @@ if (OPENSSL_FOUND)
   target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
 else()
   message("test/ OpenSSL not found, TLS tests will be skipped")
+endif()
+
+# Platform definitions for the TLS event loop test (must match lib/CMakeLists.txt)
+if(UNIX AND NOT APPLE)
+    set_property(SOURCE test_tls_event_loop.cpp APPEND PROPERTY COMPILE_DEFINITIONS PLATFORM_LINUX=1 PLATFORM_APPLE=0 PLATFORM_WINDOWS=0)
+elseif(APPLE)
+    set_property(SOURCE test_tls_event_loop.cpp APPEND PROPERTY COMPILE_DEFINITIONS PLATFORM_LINUX=0 PLATFORM_APPLE=1 PLATFORM_WINDOWS=0)
+else()
+    set_property(SOURCE test_tls_event_loop.cpp APPEND PROPERTY COMPILE_DEFINITIONS PLATFORM_LINUX=0 PLATFORM_APPLE=0 PLATFORM_WINDOWS=1)
 endif()
 
 # Add test to CTest
