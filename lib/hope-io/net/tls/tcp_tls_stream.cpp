@@ -176,6 +176,7 @@ namespace {
             auto* method = TLS_client_method();
             auto* c = SSL_CTX_new(method);
             if (c) {
+                SSL_CTX_set_verify(c, SSL_VERIFY_NONE, nullptr);
                 SSL_CTX_set_session_cache_mode(c,
                     SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
                 SSL_CTX_sess_set_cache_size(c, 128);
