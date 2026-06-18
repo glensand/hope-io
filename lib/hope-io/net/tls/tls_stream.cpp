@@ -65,6 +65,7 @@ namespace {
             if (c) {
                 // Enable session caching on the client side.
                 // When reconnecting to the same host, this skips the asymmetric-key handshake.
+                SSL_CTX_set_verify(c, SSL_VERIFY_NONE, nullptr);
                 SSL_CTX_set_session_cache_mode(c,
                     SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
                 SSL_CTX_sess_set_cache_size(c, 128);
