@@ -15,6 +15,7 @@ file(GLOB CL_HEADERS
     hope-io/net/win/*.h
     hope-io/net/nix/*.h
     hope-io/net/tls/*.h
+    hope-io/net/linux/*.h
 )
 
 file(GLOB CL_SOURCES
@@ -32,29 +33,29 @@ find_package(OpenSSL)
 if (OPENSSL_FOUND)
     message("Hope-io/ Found openssl, tls features are available")
 
-    add_definitions(-DHOPE_IO_USE_OPENSSL)
+    target_compile_definitions(hope-io PUBLIC -DHOPE_IO_USE_OPENSSL)
     set(OPENSSL_USE_STATIC_LIBS TRUE)
     target_link_libraries(hope-io ${OPENSSL_LIBRARIES})
-    include_directories(${OPENSSL_INCLUDE_DIR})
+    target_include_directories(hope-io PUBLIC ${OPENSSL_INCLUDE_DIR})
     message(${OPENSSL_INCLUDE_DIR})
 else ()
     message("Hope-io/ OPenSSl not found, tls features is not available")
 endif ()
 
 if(UNIX AND NOT APPLE)
-    add_definitions(-DPLATFORM_LINUX=1)
-    add_definitions(-DPLATFORM_APPLE=0)
-    add_definitions(-DPLATFORM_WINDOWS=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_LINUX=1)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_APPLE=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_WINDOWS=0)
     message(STATUS ">>> Linux")
 elseif(APPLE)
-    add_definitions(-DPLATFORM_LINUX=0)
-    add_definitions(-DPLATFORM_APPLE=1)
-    add_definitions(-DPLATFORM_WINDOWS=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_LINUX=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_APPLE=1)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_WINDOWS=0)
     message(STATUS ">>> Apple")
 else()
-    add_definitions(-DPLATFORM_LINUX=0)
-    add_definitions(-DPLATFORM_APPLE=0)
-    add_definitions(-DPLATFORM_WINDOWS=1)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_LINUX=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_APPLE=0)
+    target_compile_definitions(hope-io PUBLIC -DPLATFORM_WINDOWS=1)
     message(STATUS ">>> Windows")
 endif()
 

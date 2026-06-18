@@ -56,7 +56,7 @@ TEST_F(PlatformCompatibilityTest, PlatformDetection) {
 
 // Test cross-platform stream behavior
 TEST_F(PlatformCompatibilityTest, StreamBehavior) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
 
     std::thread server_thread([&acceptor]() {
@@ -66,7 +66,7 @@ TEST_F(PlatformCompatibilityTest, StreamBehavior) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     // Both platforms should support these operations
@@ -86,7 +86,7 @@ TEST_F(PlatformCompatibilityTest, StreamBehavior) {
 
 // Test that set_options works after connect (cross-platform)
 TEST_F(PlatformCompatibilityTest, SetOptionsAfterConnect) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
 
     std::thread server_thread([&acceptor]() {
@@ -96,7 +96,7 @@ TEST_F(PlatformCompatibilityTest, SetOptionsAfterConnect) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     hope::io::stream_options opts;
@@ -116,7 +116,7 @@ TEST_F(PlatformCompatibilityTest, SetOptionsAfterConnect) {
 // Test Windows read() return value bug
 TEST_F(PlatformCompatibilityTest, WindowsReadReturnValue) {
 #if PLATFORM_WINDOWS
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
 
     const std::string test_message = "Test";
@@ -133,7 +133,7 @@ TEST_F(PlatformCompatibilityTest, WindowsReadReturnValue) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(test_message.c_str(), test_message.length());
 
@@ -154,7 +154,7 @@ TEST_F(PlatformCompatibilityTest, WindowsReadReturnValue) {
 // Test Unix read() return value (should be correct)
 TEST_F(PlatformCompatibilityTest, UnixReadReturnValue) {
 #if PLATFORM_LINUX || PLATFORM_APPLE
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
 
     const std::string test_message = "Test";
@@ -169,7 +169,7 @@ TEST_F(PlatformCompatibilityTest, UnixReadReturnValue) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(test_message.c_str(), test_message.length());
 
@@ -188,7 +188,7 @@ TEST_F(PlatformCompatibilityTest, UnixReadReturnValue) {
 
 // Test read_once length parameter bug (both platforms)
 TEST_F(PlatformCompatibilityTest, ReadOnceLengthBug) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
 
     const std::string test_message = "Hello World";
@@ -205,7 +205,7 @@ TEST_F(PlatformCompatibilityTest, ReadOnceLengthBug) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(test_message.c_str(), test_message.length());
 
@@ -225,7 +225,7 @@ TEST_F(PlatformCompatibilityTest, ReadOnceLengthBug) {
 // Test Windows acceptor doesn't set options on accepted streams
 TEST_F(PlatformCompatibilityTest, WindowsAcceptorOptions) {
 #if PLATFORM_WINDOWS
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
 
     hope::io::stream_options opts;
     opts.read_timeout = 2000;
@@ -234,7 +234,7 @@ TEST_F(PlatformCompatibilityTest, WindowsAcceptorOptions) {
 
     std::thread client_thread([this]() {
         std::this_thread::sleep_for(50ms);
-        auto* client = hope::io::create_stream();
+        auto* client = new hope::io::tcp_stream();
         client->connect("127.0.0.1", test_port);
         std::this_thread::sleep_for(50ms);
         client->disconnect();
@@ -255,17 +255,18 @@ TEST_F(PlatformCompatibilityTest, WindowsAcceptorOptions) {
 // Test Unix acceptor sets options on accepted streams
 TEST_F(PlatformCompatibilityTest, UnixAcceptorOptions) {
 #if PLATFORM_LINUX || PLATFORM_APPLE
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
+
+    acceptor->open(test_port);
 
     hope::io::stream_options opts;
     opts.read_timeout = 2000;
     opts.write_timeout = 2000;
     acceptor->set_options(opts);
-    acceptor->open(test_port);
 
     std::thread client_thread([this]() {
         std::this_thread::sleep_for(50ms);
-        auto* client = hope::io::create_stream();
+        auto* client = new hope::io::tcp_stream();
         client->connect("127.0.0.1", test_port);
         std::this_thread::sleep_for(50ms);
         client->disconnect();
@@ -287,9 +288,9 @@ TEST_F(PlatformCompatibilityTest, UnixAcceptorOptions) {
 
 // Test UDP platform differences
 TEST_F(PlatformCompatibilityTest, UdpPlatformDifferences) {
-    auto* builder = hope::io::create_udp_builder();
-    auto* receiver = hope::io::create_udp_receiver();
-    auto* sender = hope::io::create_udp_sender();
+    auto* builder = new hope::io::udp_builder_impl();
+    auto* receiver = new hope::io::udp_receiver_impl();
+    auto* sender = new hope::io::udp_sender_impl();
 
 #if PLATFORM_WINDOWS
     // On Windows, UDP is not implemented
@@ -310,7 +311,7 @@ TEST_F(PlatformCompatibilityTest, UdpPlatformDifferences) {
 
 // Test event loop platform differences
 TEST_F(PlatformCompatibilityTest, EventLoopPlatformDifferences) {
-    auto* loop2 = hope::io::create_event_loop();
+    auto* loop2 = new hope::io::event_loop_impl();
 
 #if PLATFORM_WINDOWS
     // On Windows, event loop is not implemented

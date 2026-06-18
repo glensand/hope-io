@@ -58,7 +58,7 @@ std::thread worker;
 int main() {
     PROFILER_INIT
     hope::io::init();
-    auto* loop = hope::io::create_event_loop();
+    auto* loop = new hope::io::event_loop_impl();
     PROFILER_START_LISTEN
     try {
         hope::io::event_loop::callbacks cb{

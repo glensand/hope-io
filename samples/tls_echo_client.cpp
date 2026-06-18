@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     hope::io::init();
     hope::io::init_tls();
     
-    auto* stream = hope::io::create_tls_stream();
+    auto* stream = new hope::io::tcp_tls_stream(nullptr);
     try {
         stream->connect("localhost", 1339);
         message msg{ argv[1] };

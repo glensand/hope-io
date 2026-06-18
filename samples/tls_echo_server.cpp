@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     hope::io::init();
     hope::io::init_tls();
 
-    auto* acceptor = hope::io::create_tls_acceptor("key.pem", "cert.pem");
+    auto* acceptor = new hope::io::tls_acceptor_impl("key.pem", "cert.pem");
     acceptor->open(1339);
 
     auto* connection = acceptor->accept();

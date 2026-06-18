@@ -55,15 +55,15 @@ TEST_F(TlsTest, CreateTlsAcceptor) {
     }
     
     // This would require actual certificate files
-    // auto* acceptor = hope::io::create_tls_acceptor("key.pem", "cert.pem");
+    // auto* acceptor = new hope::io::tls_acceptor_impl("key.pem", "cert.pem");
     // ASSERT_NE(acceptor, nullptr);
     // delete acceptor;
 }
 
 // Test TLS stream creation
 TEST_F(TlsTest, CreateTlsStream) {
-    auto* tcp_stream = hope::io::create_stream();
-    auto* tls_stream = hope::io::create_tls_stream(tcp_stream);
+    auto* tcp_stream = new hope::io::tcp_stream();
+    auto* tls_stream = new hope::io::tcp_tls_stream(tcp_stream);
     
     // TLS stream creation might fail if OpenSSL is not properly initialized
     // Just check it doesn't crash
@@ -76,7 +76,7 @@ TEST_F(TlsTest, CreateTlsStream) {
 
 // // Test TLS websockets stream creation
 // TEST_F(TlsTest, CreateTlsWebsocketsStream) {
-//     auto* tcp_stream = hope::io::create_stream();
+//     auto* tcp_stream = new hope::io::tcp_stream();
 //     auto* ws_stream = hope::io::create_tls_websockets_stream(tcp_stream);
 //
 //     // Websockets stream creation might fail if not properly configured

@@ -160,7 +160,7 @@ int main() {
     try {
         hope::io::init();
 
-        auto* acceptor = hope::io::create_acceptor();
+        auto* acceptor = new hope::io::tcp_acceptor();
         acceptor->open(PORT);
 
         std::cout << "Server is listening on port " << PORT << "...\n";

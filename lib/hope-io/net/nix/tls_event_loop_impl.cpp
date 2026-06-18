@@ -8,52 +8,32 @@
 
 #include "hope-io/coredefs.h"
 
-#if PLATFORM_LINUX
+#if PLATFORM_APPLE
 
-#include "hope-io/net/linux/tls_event_loop_impl.h"
+#include "hope-io/net/nix/tls_event_loop_impl.h"
+#include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/factory.h"
 #include "hope-io/net/tls/tls_init.h"
+#include "hope-io/net/factory.h"
 
 #include "openssl/ssl.h"
 #include "openssl/err.h"
 
 #include <deque>
 #include <unordered_set>
+#include <unordered_map>
 #include <atomic>
-#include <vector>
 
 #include <fcntl.h>
-#include <poll.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <netinet/ip.h>
 #include <sys/types.h>
-#include <netdb.h>
-#include <string.h>
-#include <sys/epoll.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <sys/event.h>
+#include <sys/time.h>
+#include <netinet/ip.h>
 
 namespace hope::io {
-
-    tls_event_loop_impl::tls_event_loop_impl() {
-        event_loop::connection::on_state_changed = [this](const event_loop::connection& conn) {
-            NAMED_SCOPE(TlsSetState);
-            if (conn.get_state() == event_loop::connection_state::die) {
-                remove_connection(conn.descriptor);
-            }
-        };
-    }
-
-    tls_event_loop_impl::~tls_event_loop_impl() {
-        event_loop::connection::on_state_changed = nullptr;
-        if (m_ctx) {
-            SSL_CTX_free(m_ctx);
-        }
-    }
 
     event_loop::fixed_size_buffer* tls_event_loop_impl::buffer_pool::allocate() {
         event_loop::fixed_size_buffer* allocated = nullptr;
@@ -76,8 +56,41 @@ namespace hope::io {
             m_impl.emplace_back(new event_loop::fixed_size_buffer);
     }
 
+    tls_event_loop_impl::tls_event_loop_impl() {
+        event_loop::connection::on_state_changed = [this](const event_loop::connection& conn) {
+            NAMED_SCOPE(TlsSetStateKq);
+            if (conn.get_state() == event_loop::connection_state::die) {
+                remove_connection(conn.descriptor);
+            }
+        };
+    }
+
+    tls_event_loop_impl::~tls_event_loop_impl() {
+        event_loop::connection::on_state_changed = nullptr;
+        if (m_ctx) {
+            SSL_CTX_free(m_ctx);
+        }
+        if (m_kq != -1) {
+            ::close(m_kq);
+        }
+        for (auto& [fd, tls] : m_tls_states) {
+            if (tls.ssl) SSL_free(tls.ssl);
+        }
+        m_tls_states.clear();
+        std::vector<event_loop::fixed_size_buffer*> bufs;
+        for (const auto& conn : m_connections) {
+            if (conn.buffer) {
+                bufs.push_back(conn.buffer);
+            }
+        }
+        m_connections.clear();
+        for (auto* buf : bufs) {
+            m_pl.redeem(buf);
+        }
+    }
+
     void tls_event_loop_impl::run(const tls_config& cfg, event_loop::callbacks&& cb) {
-        THREAD_SCOPE(TLS_EVENT_LOOP_THREAD);
+        THREAD_SCOPE(TLS_EVENT_LOOP_KQ);
 
         init_tls();
         auto* method = TLS_server_method();
@@ -120,66 +133,68 @@ namespace hope::io {
         }
 
         auto flags = fcntl(m_listen_socket, F_GETFL, 0);
-        fcntl(m_listen_socket, F_SETFL, flags | O_NONBLOCK);
+        if (flags != -1) {
+            fcntl(m_listen_socket, F_SETFL, flags | O_NONBLOCK);
+        }
         listen(m_listen_socket, cfg.max_mutual_connections);
 
-        m_epfd = epoll_create(1);
-        if (m_epfd == -1) {
-            throw std::runtime_error("tls_event_loop: epoll_create failed");
+        m_kq = kqueue();
+        if (m_kq == -1) {
+            throw std::runtime_error("tls_event_loop: kqueue() failed");
         }
 
-        epoll_ctl_add(m_epfd, m_listen_socket, EPOLLIN | EPOLLET, cb);
+        struct kevent ev;
+        EV_SET(&ev, m_listen_socket, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+        if (kevent(m_kq, &ev, 1, nullptr, 0, nullptr) == -1) {
+            throw std::runtime_error("tls_event_loop: kevent register listen failed");
+        }
 
         m_cfg = cfg;
         m_pl.prepool(cfg.max_mutual_connections);
         m_events.resize(cfg.max_mutual_connections);
-        m_connections.resize(cfg.max_mutual_connections + 1);
-        m_tls_states.resize(cfg.max_mutual_connections + 1);
 
         while (m_running.load(std::memory_order_acquire)) {
-            NAMED_SCOPE(TlsTick);
-            auto nfds = 0;
+            NAMED_SCOPE(TlsKqTick);
+            struct timespec timeout;
+            timeout.tv_sec = cfg.epoll_timeout / 1000;
+            timeout.tv_nsec = (cfg.epoll_timeout % 1000) * 1000000;
+
+            int nfds;
             {
-                NAMED_SCOPE(TlsEpoll);
-                nfds = epoll_wait(m_epfd, m_events.data(), (int)m_events.size(), cfg.epoll_timeout);
+                NAMED_SCOPE(TlsKevent);
+                nfds = kevent(m_kq, nullptr, 0, m_events.data(), (int)m_events.size(), &timeout);
             }
 
-            for (auto i = 0; i < nfds; ++i) {
-                NAMED_SCOPE(TlsProcessOne);
-                auto& event = m_events[i];
-                auto sock = event.data.fd;
+            if (nfds < 0) {
+                event_loop::connection dumb;
+                cb.on_err(dumb, "tls_event_loop: kevent() failed");
+                break;
+            }
 
-                if (sock == m_listen_socket) {
+            for (int i = 0; i < nfds; ++i) {
+                NAMED_SCOPE(TlsKqProcessOne);
+                auto& event = m_events[i];
+                auto fd = (int)event.ident;
+
+                if (event.flags & EV_EOF) {
+                    remove_connection(fd);
+                } else if (fd == m_listen_socket) {
                     handle_accept(cb);
-                } else if (event.events & (EPOLLRDHUP | EPOLLHUP | POLLERR)) {
-                    remove_connection(sock);
-                } else if (m_pending_handshakes.count(sock)) {
-                    retry_handshake(sock, cb);
-                } else if (event.events & POLLIN) {
-                    handle_read(m_connections[sock], cb);
-                } else if (event.events & POLLOUT) {
-                    handle_write(m_connections[sock], cb);
+                } else if (m_pending_handshakes.count(fd)) {
+                    retry_handshake(fd, cb);
+                } else if (event.filter == EVFILT_READ) {
+                    auto it = m_connections.find(fd);
+                    if (it != m_connections.end()) {
+                        handle_read((event_loop::connection&)*it, cb);
+                    }
+                } else if (event.filter == EVFILT_WRITE) {
+                    auto it = m_connections.find(fd);
+                    if (it != m_connections.end()) {
+                        handle_write((event_loop::connection&)*it, cb);
+                    }
                 }
             }
         }
-
-        // Cleanup all remaining connections
-        for (auto& tls : m_tls_states) {
-            if (tls.ssl) {
-                SSL_free(tls.ssl);
-                tls.ssl = nullptr;
-            }
-        }
-        for (auto& conn : m_connections) {
-            if (conn.buffer) {
-                m_pl.redeem(conn.buffer);
-                conn.buffer = nullptr;
-            }
-        }
-        m_pending_handshakes.clear();
-
-        close(m_listen_socket);
-        close(m_epfd);
     }
 
     void tls_event_loop_impl::stop() {
@@ -187,9 +202,9 @@ namespace hope::io {
     }
 
     void tls_event_loop_impl::handle_accept(event_loop::callbacks& cb) {
-        NAMED_SCOPE(TlsHandleAccept);
+        NAMED_SCOPE(TlsKqHandleAccept);
         for (auto i = 0; i < m_cfg.max_accepts_per_tick; ++i) {
-            NAMED_SCOPE(TlsAcceptOne);
+            NAMED_SCOPE(TlsKqAcceptOne);
             struct sockaddr_in client_addr{};
             socklen_t socklen = sizeof(client_addr);
             int sock = accept(m_listen_socket, (struct sockaddr*)&client_addr, &socklen);
@@ -218,19 +233,28 @@ namespace hope::io {
             SSL_set_fd(ssl, sock);
             SSL_set_accept_state(ssl);
 
+            struct kevent ev[2];
+            EV_SET(&ev[0], sock, EVFILT_READ, EV_ADD, 0, 0, nullptr);
+            EV_SET(&ev[1], sock, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
+            if (kevent(m_kq, ev, 2, nullptr, 0, nullptr) == -1) {
+                SSL_free(ssl);
+                ::close(sock);
+                continue;
+            }
+
             int ret = SSL_do_handshake(ssl);
             if (ret == 1) {
                 register_connection(sock, ssl, cb);
-                cb.on_connect(m_connections[sock]);
+                cb.on_connect((event_loop::connection&)*m_connections.find(sock));
             } else {
                 int err = SSL_get_error(ssl, ret);
                 if (err == SSL_ERROR_WANT_READ) {
-                    epoll_ctl_add(m_epfd, sock, EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLET, cb);
                     m_pending_handshakes.insert(sock);
-                    auto& tls = m_tls_states[sock];
-                    tls.ssl = ssl;
-                    connection_for_fd(sock).descriptor = sock;
+                    m_tls_states[sock] = { ssl };
                 } else {
+                    struct kevent del;
+                    EV_SET(&del, sock, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+                    kevent(m_kq, &del, 1, nullptr, 0, nullptr);
                     SSL_free(ssl);
                     ::close(sock);
                 }
@@ -239,19 +263,23 @@ namespace hope::io {
     }
 
     void tls_event_loop_impl::retry_handshake(int32_t sock, event_loop::callbacks& cb) {
-        NAMED_SCOPE(TlsRetryHandshake);
+        NAMED_SCOPE(TlsKqRetryHs);
         auto& tls = m_tls_states[sock];
         int ret = SSL_do_handshake(tls.ssl);
         if (ret == 1) {
             m_pending_handshakes.erase(sock);
             register_connection(sock, tls.ssl, cb);
-            cb.on_connect(m_connections[sock]);
+            cb.on_connect((event_loop::connection&)*m_connections.find(sock));
         } else {
             int err = SSL_get_error(tls.ssl, ret);
             if (err != SSL_ERROR_WANT_READ) {
                 SSL_free(tls.ssl);
                 tls.ssl = nullptr;
                 m_pending_handshakes.erase(sock);
+                m_tls_states.erase(sock);
+                struct kevent del;
+                EV_SET(&del, sock, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+                kevent(m_kq, &del, 1, nullptr, 0, nullptr);
                 ::close(sock);
                 event_loop::connection dumb;
                 cb.on_err(dumb, "tls_event_loop: handshake failed");
@@ -260,29 +288,21 @@ namespace hope::io {
     }
 
     void tls_event_loop_impl::register_connection(int32_t sock, SSL* ssl, event_loop::callbacks&) {
-        NAMED_SCOPE(TlsRegisterConn);
-        auto& tls = m_tls_states[sock];
-        HOPE_ASSERT(tls.ssl == nullptr, "tls_event_loop: double register");
-        tls.ssl = ssl;
-
-        auto& conn = connection_for_fd(sock);
+        NAMED_SCOPE(TlsKqRegister);
+        m_tls_states[sock] = { ssl };
+        auto&& conn = (event_loop::connection&)*m_connections.emplace(sock).first;
         conn.descriptor = sock;
         conn.buffer = m_pl.allocate();
-
-        epoll_event ev;
-        ev.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLET;
-        ev.data.fd = sock;
-        epoll_ctl(m_epfd, EPOLL_CTL_MOD, sock, &ev);
     }
 
     void tls_event_loop_impl::handle_read(event_loop::connection& conn, event_loop::callbacks& cb) {
-        NAMED_SCOPE(TlsHandleRead);
+        NAMED_SCOPE(TlsKqHandleRead);
         if (conn.get_state() != event_loop::connection_state::read) return;
 
-        auto& tls = m_tls_states[conn.descriptor];
         bool error = false;
         std::size_t total_received = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
             ERR_clear_error();
+            auto& tls = m_tls_states[conn.descriptor];
             int received = SSL_read(tls.ssl, data, (int)size);
             if (received > 0) return (std::size_t)received;
 
@@ -307,12 +327,12 @@ namespace hope::io {
     }
 
     void tls_event_loop_impl::handle_write(event_loop::connection& conn, event_loop::callbacks& cb) {
-        NAMED_SCOPE(TlsHandleWrite);
+        NAMED_SCOPE(TlsKqHandleWrite);
         if (conn.get_state() != event_loop::connection_state::write) return;
 
-        auto& tls = m_tls_states[conn.descriptor];
         conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
             ERR_clear_error();
+            auto& tls = m_tls_states[conn.descriptor];
             int sent = SSL_write(tls.ssl, data, (int)size);
             if (sent > 0) return (std::size_t)sent;
 
@@ -331,38 +351,33 @@ namespace hope::io {
     }
 
     void tls_event_loop_impl::remove_connection(int32_t descriptor) {
-        NAMED_SCOPE(TlsRemoveConn);
-        epoll_ctl(m_epfd, EPOLL_CTL_DEL, descriptor, nullptr);
+        NAMED_SCOPE(TlsKqRemove);
 
-        auto& tls = m_tls_states[descriptor];
-        if (tls.ssl) {
-            SSL_free(tls.ssl);
-            tls.ssl = nullptr;
+        struct kevent ev;
+        EV_SET(&ev, descriptor, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+        kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
+        EV_SET(&ev, descriptor, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+        kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
+
+        auto it = m_tls_states.find(descriptor);
+        if (it != m_tls_states.end()) {
+            if (it->second.ssl) {
+                SSL_free(it->second.ssl);
+            }
+            m_tls_states.erase(it);
         }
+
         m_pending_handshakes.erase(descriptor);
+        ::close(descriptor);
 
-        close(descriptor);
-
-        auto& conn = connection_for_fd(descriptor);
-        if (conn.buffer) {
-            m_pl.redeem(conn.buffer);
-            conn.buffer = nullptr;
-        }
-    }
-
-    event_loop::connection& tls_event_loop_impl::connection_for_fd(int32_t fd) {
-        HOPE_ASSERT(fd >= 0 && fd < (int32_t)m_connections.size(),
-                    "tls_event_loop: fd out of range");
-        return m_connections[fd];
-    }
-
-    void tls_event_loop_impl::epoll_ctl_add(int32_t epfd, int32_t fd, uint32_t events, event_loop::callbacks& cb) {
-        epoll_event ev;
-        ev.events = events;
-        ev.data.fd = fd;
-        if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
-            event_loop::connection dumb;
-            cb.on_err(dumb, std::string("tls_event_loop: epoll_ctl ADD failed: ") + strerror(errno));
+        auto conn_it = m_connections.find(descriptor);
+        if (conn_it != m_connections.end()) {
+            auto& conn = (event_loop::connection&)*conn_it;
+            if (conn.buffer) {
+                m_pl.redeem(conn.buffer);
+                conn.buffer = nullptr;
+            }
+            m_connections.erase(conn_it);
         }
     }
 
@@ -381,4 +396,4 @@ namespace hope::io {
     tls_event_loop* create_tls_event_loop() { return new tls_event_loop_impl; }
 
 }
-#endif // PLATFORM_LINUX
+#endif

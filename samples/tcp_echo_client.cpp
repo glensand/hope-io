@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
     hope::io::init();
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     try {
         stream->connect("localhost", 1338);
         stream->set_options({});

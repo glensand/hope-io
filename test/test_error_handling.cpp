@@ -34,7 +34,7 @@ protected:
 
 // Test reading from disconnected stream
 TEST_F(ErrorHandlingTest, ReadFromDisconnectedStream) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     
     // Try to read from unconnected stream - should throw or return error
     char buffer[256];
@@ -52,7 +52,7 @@ TEST_F(ErrorHandlingTest, ReadFromDisconnectedStream) {
 
 // Test writing to disconnected stream
 TEST_F(ErrorHandlingTest, WriteToDisconnectedStream) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     
     const char* data = "test";
     // Writing to unconnected stream should throw
@@ -63,7 +63,7 @@ TEST_F(ErrorHandlingTest, WriteToDisconnectedStream) {
 
 // Test reading after server disconnect
 TEST_F(ErrorHandlingTest, ReadAfterServerDisconnect) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     std::thread server_thread([&acceptor]() {
@@ -74,7 +74,7 @@ TEST_F(ErrorHandlingTest, ReadAfterServerDisconnect) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     std::this_thread::sleep_for(50ms);
@@ -98,7 +98,7 @@ TEST_F(ErrorHandlingTest, ReadAfterServerDisconnect) {
 
 // Test writing to closed connection
 TEST_F(ErrorHandlingTest, WriteToClosedConnection) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     std::thread server_thread([&acceptor]() {
@@ -108,7 +108,7 @@ TEST_F(ErrorHandlingTest, WriteToClosedConnection) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     std::this_thread::sleep_for(100ms); // Wait for server to close
@@ -132,7 +132,7 @@ TEST_F(ErrorHandlingTest, WriteToClosedConnection) {
 
 // Test double disconnect
 TEST_F(ErrorHandlingTest, DoubleDisconnect) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     
     // Disconnecting twice should be safe
     ASSERT_NO_THROW(stream->disconnect());
@@ -143,7 +143,7 @@ TEST_F(ErrorHandlingTest, DoubleDisconnect) {
 
 // Test port 0 behavior (OS assigns port)
 TEST_F(ErrorHandlingTest, InvalidPort) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     
     // Port 0 is valid on Linux - OS assigns an available port
     // Just verify it doesn't crash (behavior is OS-dependent)
@@ -159,7 +159,7 @@ TEST_F(ErrorHandlingTest, InvalidPort) {
 
 // Test very large port number
 TEST_F(ErrorHandlingTest, VeryLargePort) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     
     // Port > 65535 gets truncated on Linux (70000 & 0xFFFF = 4464)
     // Just verify it doesn't crash (behavior is OS-dependent)
@@ -175,7 +175,7 @@ TEST_F(ErrorHandlingTest, VeryLargePort) {
 
 // Test connection timeout — connect to a port that's not listening
 TEST_F(ErrorHandlingTest, ConnectionTimeout) {
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     
     // Try to connect to a port that's not listening
     // Should throw quickly with ECONNREFUSED
@@ -186,7 +186,7 @@ TEST_F(ErrorHandlingTest, ConnectionTimeout) {
 
 // Test read timeout
 TEST_F(ErrorHandlingTest, ReadTimeout) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     std::thread server_thread([&acceptor]() {
@@ -198,7 +198,7 @@ TEST_F(ErrorHandlingTest, ReadTimeout) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -225,7 +225,7 @@ TEST_F(ErrorHandlingTest, ReadTimeout) {
 
 // Test write timeout
 TEST_F(ErrorHandlingTest, WriteTimeout) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     std::thread server_thread([&acceptor]() {
@@ -237,7 +237,7 @@ TEST_F(ErrorHandlingTest, WriteTimeout) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -262,10 +262,10 @@ TEST_F(ErrorHandlingTest, WriteTimeout) {
 
 // Test memory cleanup on exception (bind conflict between two acceptors)
 TEST_F(ErrorHandlingTest, MemoryCleanupOnException) {
-    auto* acceptor1 = hope::io::create_acceptor();
+    auto* acceptor1 = new hope::io::tcp_acceptor();
     acceptor1->open(test_port);
 
-    auto* acceptor2 = hope::io::create_acceptor();
+    auto* acceptor2 = new hope::io::tcp_acceptor();
 
     try {
         // Second acceptor trying same port should fail with EADDRINUSE

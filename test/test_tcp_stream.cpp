@@ -27,7 +27,7 @@ protected:
         // Use unique port for each test to avoid bind conflicts
         static std::atomic<int> port_counter{15000};
         test_port = port_counter.fetch_add(1);
-        acceptor = hope::io::create_acceptor();
+        acceptor = new hope::io::tcp_acceptor();
         acceptor->open(test_port);
     }
 
@@ -46,7 +46,7 @@ protected:
 
 // Test basic stream creation
 TEST_F(TcpStreamTest, CreateStream) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     ASSERT_NE(stream, nullptr);
     delete stream;
 }
@@ -60,7 +60,7 @@ TEST_F(TcpStreamTest, ConnectToServer) {
 
     std::this_thread::sleep_for(50ms); // Give server time to start listening
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     ASSERT_NO_THROW(client->connect("127.0.0.1", test_port));
     
     client->disconnect();
@@ -84,7 +84,7 @@ TEST_F(TcpStreamTest, WriteAndRead) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     client->write(test_message.c_str(), test_message.length());
@@ -113,7 +113,7 @@ TEST_F(TcpStreamTest, ReadOnce) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(test_message.c_str(), test_message.length());
     
@@ -130,7 +130,7 @@ TEST_F(TcpStreamTest, ReadOnce) {
 
 // Test stream options
 TEST_F(TcpStreamTest, SetOptions) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     
     // set_options requires a connected socket; this test just validates creation.
     // Actual option application is tested in SetOptionsAfterConnection.
@@ -140,7 +140,7 @@ TEST_F(TcpStreamTest, SetOptions) {
 
 // Test that connection to a closed port fails quickly (ECONNREFUSED)
 TEST_F(TcpStreamTest, ConnectionToClosedPort) {
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     
     // Try to connect to a port that's not listening
     // Should throw quickly with ECONNREFUSED
@@ -162,7 +162,7 @@ TEST_F(TcpStreamTest, ReadTimeoutEnforced) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -206,7 +206,7 @@ TEST_F(TcpStreamTest, WriteTimeoutEnforced) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -243,7 +243,7 @@ TEST_F(TcpStreamTest, OptionsPersistence) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     hope::io::stream_options opts1;
@@ -272,7 +272,7 @@ TEST_F(TcpStreamTest, AllOptionsParameters) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -303,7 +303,7 @@ TEST_F(TcpStreamTest, NonBlockingMode) {
     
     std::this_thread::sleep_for(50ms);
     
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -344,7 +344,7 @@ TEST_F(TcpStreamTest, NonBlockingMode) {
 
 // Test that write_buffer_size option is accepted (even if not directly verifiable)
 TEST_F(TcpStreamTest, WriteBufferSizeOption) {
-    auto* stream = hope::io::create_stream();
+    auto* stream = new hope::io::tcp_stream();
     
     // write_buffer_size is not applied to the raw socket;
     // this test is kept as a placeholder for future buffer management.
@@ -361,7 +361,7 @@ TEST_F(TcpStreamTest, SetOptionsAfterConnection) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     hope::io::stream_options opts;
@@ -386,7 +386,7 @@ TEST_F(TcpStreamTest, SetOptionsAfterConnection) {
 // Test that Windows applies options during connect
 #if PLATFORM_WINDOWS
 TEST_F(TcpStreamTest, WindowsOptionsAppliedDuringConnect) {
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     
     hope::io::stream_options opts;
     opts.connection_timeout = 2000;
@@ -436,7 +436,7 @@ TEST_F(TcpStreamTest, LargeDataTransfer) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(send_data.data(), data_size);
     
@@ -471,7 +471,7 @@ TEST_F(TcpStreamTest, MultipleWritesReads) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     for (int i = 0; i < num_messages; ++i) {
@@ -503,7 +503,7 @@ TEST_F(TcpStreamTest, Disconnect) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     client->disconnect();
@@ -518,7 +518,7 @@ TEST_F(TcpStreamTest, Disconnect) {
 
 // Test connection to invalid address
 TEST_F(TcpStreamTest, ConnectToInvalidAddress) {
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     
     // This should throw an exception
     EXPECT_THROW(client->connect("999.999.999.999", 80), std::exception);
@@ -539,7 +539,7 @@ TEST_F(TcpStreamTest, TemplateReadWrite) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(send_value);
     
@@ -566,7 +566,7 @@ TEST_F(TcpStreamTest, StringReadWrite) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     client->write(send_str);
     
@@ -591,7 +591,7 @@ TEST_F(TcpStreamTest, PlatformSocket) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     int32_t socket = client->platform_socket();
@@ -615,7 +615,7 @@ TEST_F(TcpStreamTest, GetEndpoint) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     std::this_thread::sleep_for(50ms);

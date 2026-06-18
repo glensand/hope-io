@@ -6,17 +6,21 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/hope-io
  */
 
-#include "hope-io/coredefs.h"
+#pragma once
 
-#if PLATFORM_WINDOWS
+#include "hope-io/net/tls/tls_stream.h"
 
-#include "hope-io/net/factory.h"
+#ifdef HOPE_IO_USE_OPENSSL
 
 namespace hope::io {
 
-    udp_builder* create_udp_builder() {
-        return nullptr;
-    }
+    class tls_server_stream final : public base_tls_stream {
+    public:
+        tls_server_stream(tcp_stream* tcp_stream, SSL_CTX* context);
+        void connect(std::string_view ip, std::size_t port) override;
+        void disconnect() override;
+        void accept_tls();
+    };
 
 }
 

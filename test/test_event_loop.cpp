@@ -35,7 +35,7 @@ protected:
 
 // Test event loop creation
 TEST_F(EventLoopTest, CreateEventLoop) {
-    auto* loop = hope::io::create_event_loop();
+    auto* loop = new hope::io::event_loop_impl();
     
 #if PLATFORM_WINDOWS
     // On Windows, event loop is not implemented
@@ -48,7 +48,7 @@ TEST_F(EventLoopTest, CreateEventLoop) {
 
 // Test event loop creation with max connections
 TEST_F(EventLoopTest, CreateEventLoop2) {
-    auto* loop = hope::io::create_event_loop();
+    auto* loop = new hope::io::event_loop_impl();
     
 #if PLATFORM_WINDOWS
     // On Windows, event loop is not implemented
@@ -62,7 +62,7 @@ TEST_F(EventLoopTest, CreateEventLoop2) {
 // Test event loop run and stop (Unix/Apple only)
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(EventLoopTest, RunAndStop) {
-    auto* loop = hope::io::create_event_loop();
+    auto* loop = new hope::io::event_loop_impl();
     if (!loop) {
         GTEST_SKIP() << "Event loop not implemented on this platform";
     }
@@ -104,7 +104,7 @@ TEST_F(EventLoopTest, RunAndStop) {
 // Test event loop connection handling (Unix/Apple only)
 #if PLATFORM_LINUX || PLATFORM_APPLE
 TEST_F(EventLoopTest, ConnectionHandling) {
-    auto* loop = hope::io::create_event_loop();
+    auto* loop = new hope::io::event_loop_impl();
     if (!loop) {
         GTEST_SKIP() << "Event loop not implemented on this platform";
     }
@@ -145,7 +145,7 @@ TEST_F(EventLoopTest, ConnectionHandling) {
     std::this_thread::sleep_for(100ms);
     
     // Create a client connection
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
     
     const std::string test_message = "Hello from event loop test";

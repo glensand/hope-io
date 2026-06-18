@@ -30,7 +30,7 @@ struct TlsEventLoopGuard {
     std::thread thread;
 
     void start(hope::io::tls_event_loop::tls_config& cfg, hope::io::event_loop::callbacks& cb) {
-        loop = hope::io::create_tls_event_loop();
+        loop = new hope::io::tls_event_loop_impl();
         thread = std::thread([this, &cfg, &cb]() {
             loop->run(cfg, std::move(cb));
         });
@@ -105,7 +105,7 @@ protected:
 
 // Test TLS event loop creation
 TEST_F(TlsEventLoopTest, CreateTlsEventLoop) {
-    auto* loop = hope::io::create_tls_event_loop();
+    auto* loop = new hope::io::tls_event_loop_impl();
     ASSERT_NE(loop, nullptr);
     delete loop;
 }
@@ -165,9 +165,9 @@ TEST_F(TlsEventLoopTest, TlsEchoSingleClient) {
     std::this_thread::sleep_for(100ms);
 
     // Create TLS client
-    auto* tcp_stream = hope::io::create_stream();
+    auto* tcp_stream = new hope::io::tcp_stream();
     ASSERT_NE(tcp_stream, nullptr);
-    auto* tls_client = hope::io::create_tls_stream(tcp_stream);
+    auto* tls_client = new hope::io::tcp_tls_stream(tcp_stream);
     ASSERT_NE(tls_client, nullptr);
     tls_client->connect("127.0.0.1", test_port);
 
@@ -242,9 +242,9 @@ TEST_F(TlsEventLoopTest, TlsEchoMultipleClients) {
     clients.reserve(N_CLIENTS);
 
     for (int i = 0; i < N_CLIENTS; ++i) {
-        auto* tcp = hope::io::create_stream();
+        auto* tcp = new hope::io::tcp_stream();
         ASSERT_NE(tcp, nullptr);
-        auto* tls = hope::io::create_tls_stream(tcp);
+        auto* tls = new hope::io::tcp_tls_stream(tcp);
         ASSERT_NE(tls, nullptr);
         tls->connect("127.0.0.1", test_port);
         clients.push_back(tls);
@@ -300,8 +300,8 @@ TEST_F(TlsEventLoopTest, TlsLargeMessage) {
     std::string large_msg(LARGE_SIZE, 'A');
     large_msg.replace(LARGE_SIZE - 10, 10, "ENDMARKER!");
 
-    auto* tcp = hope::io::create_stream();
-    auto* tls = hope::io::create_tls_stream(tcp);
+    auto* tcp = new hope::io::tcp_stream();
+    auto* tls = new hope::io::tcp_tls_stream(tcp);
     ASSERT_NE(tls, nullptr);
     tls->connect("127.0.0.1", test_port);
 
@@ -353,7 +353,7 @@ TEST_F(TlsEventLoopTest, TlsHandshakeFail) {
     std::this_thread::sleep_for(100ms);
 
     // Connect with raw TCP — no TLS handshake
-    auto* raw = hope::io::create_stream();
+    auto* raw = new hope::io::tcp_stream();
     raw->connect("127.0.0.1", test_port);
 
     const char junk[] = "GET / HTTP/1.0\r\n\r\n";

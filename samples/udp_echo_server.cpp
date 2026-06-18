@@ -16,7 +16,7 @@
 int main(int argc, char *argv[]) {
     hope::io::init();
 
-    auto* udp_builder = hope::io::create_udp_builder();
+    auto* udp_builder = new hope::io::udp_builder_impl();
     try {
         udp_builder->init(1338);
         std::cout << "UDP server is initialized." << std::endl;
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
         std::terminate();
     }
 
-    auto* receiver = hope::io::create_udp_receiver(udp_builder->platform_socket());
+    auto* receiver = new hope::io::udp_receiver_impl(udp_builder->platform_socket());
     try {
         receiver->connect("localhost", 1338);
     }
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         std::terminate();
     }
 
-    auto* sender = hope::io::create_udp_sender(udp_builder->platform_socket());
+    auto* sender = new hope::io::udp_sender_impl(udp_builder->platform_socket());
     try {
         sender->connect("localhost", 1338);
     }

@@ -37,26 +37,26 @@ protected:
 
 // Test acceptor creation
 TEST_F(TcpAcceptorTest, CreateAcceptor) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     ASSERT_NE(acceptor, nullptr);
     delete acceptor;
 }
 
 // Test acceptor open
 TEST_F(TcpAcceptorTest, OpenPort) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     ASSERT_NO_THROW(acceptor->open(test_port));
     delete acceptor;
 }
 
 // Test acceptor accept single connection
 TEST_F(TcpAcceptorTest, AcceptSingleConnection) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     std::thread client_thread([this]() {
         std::this_thread::sleep_for(50ms);
-        auto* client = hope::io::create_stream();
+        auto* client = new hope::io::tcp_stream();
         client->connect("127.0.0.1", test_port);
         std::this_thread::sleep_for(50ms);
         client->disconnect();
@@ -73,7 +73,7 @@ TEST_F(TcpAcceptorTest, AcceptSingleConnection) {
 
 // Test acceptor accept multiple connections
 TEST_F(TcpAcceptorTest, AcceptMultipleConnections) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     const int num_clients = 5;
@@ -82,7 +82,7 @@ TEST_F(TcpAcceptorTest, AcceptMultipleConnections) {
     for (int i = 0; i < num_clients; ++i) {
         client_threads.emplace_back([this, i]() {
             std::this_thread::sleep_for(50ms + std::chrono::milliseconds(i * 10));
-            auto* client = hope::io::create_stream();
+            auto* client = new hope::io::tcp_stream();
             client->connect("127.0.0.1", test_port);
             std::this_thread::sleep_for(50ms);
             client->disconnect();
@@ -110,7 +110,7 @@ TEST_F(TcpAcceptorTest, AcceptMultipleConnections) {
 
 // Test acceptor set_options
 TEST_F(TcpAcceptorTest, SetOptions) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     
     hope::io::stream_options opts;
     opts.non_block_mode = false;
@@ -126,7 +126,7 @@ TEST_F(TcpAcceptorTest, SetOptions) {
 
 // Test acceptor raw socket
 TEST_F(TcpAcceptorTest, RawSocket) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     long long raw = acceptor->raw();
@@ -137,7 +137,7 @@ TEST_F(TcpAcceptorTest, RawSocket) {
 
 // Test acceptor with options applied to accepted connections
 TEST_F(TcpAcceptorTest, OptionsAppliedToAcceptedConnections) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     
     hope::io::stream_options opts;
     opts.read_timeout = 2000;
@@ -149,7 +149,7 @@ TEST_F(TcpAcceptorTest, OptionsAppliedToAcceptedConnections) {
     
     std::thread client_thread([this]() {
         std::this_thread::sleep_for(50ms);
-        auto* client = hope::io::create_stream();
+        auto* client = new hope::io::tcp_stream();
         client->connect("127.0.0.1", test_port);
         std::this_thread::sleep_for(50ms);
         client->disconnect();
@@ -171,10 +171,10 @@ TEST_F(TcpAcceptorTest, OptionsAppliedToAcceptedConnections) {
 
 // Test acceptor open on already used port (should fail)
 TEST_F(TcpAcceptorTest, OpenOnUsedPort) {
-    auto* acceptor1 = hope::io::create_acceptor();
+    auto* acceptor1 = new hope::io::tcp_acceptor();
     acceptor1->open(test_port);
     
-    auto* acceptor2 = hope::io::create_acceptor();
+    auto* acceptor2 = new hope::io::tcp_acceptor();
     // Opening the same port should fail
     EXPECT_THROW(acceptor2->open(test_port), std::exception);
     
@@ -184,7 +184,7 @@ TEST_F(TcpAcceptorTest, OpenOnUsedPort) {
 
 // Test acceptor accept timeout (non-blocking mode)
 TEST_F(TcpAcceptorTest, AcceptTimeout) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     
     hope::io::stream_options opts;
     opts.non_block_mode = true;
@@ -207,7 +207,7 @@ TEST_F(TcpAcceptorTest, AcceptTimeout) {
 
 // Test acceptor with data exchange
 TEST_F(TcpAcceptorTest, AcceptWithDataExchange) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     const std::string test_message = "Test message from client";
@@ -215,7 +215,7 @@ TEST_F(TcpAcceptorTest, AcceptWithDataExchange) {
     
     std::thread client_thread([this, &test_message]() {
         std::this_thread::sleep_for(50ms);
-        auto* client = hope::io::create_stream();
+        auto* client = new hope::io::tcp_stream();
         client->connect("127.0.0.1", test_port);
         client->write(test_message.c_str(), test_message.length());
         std::this_thread::sleep_for(50ms);
@@ -239,7 +239,7 @@ TEST_F(TcpAcceptorTest, AcceptWithDataExchange) {
 
 // Test acceptor cleanup
 TEST_F(TcpAcceptorTest, Cleanup) {
-    auto* acceptor = hope::io::create_acceptor();
+    auto* acceptor = new hope::io::tcp_acceptor();
     acceptor->open(test_port);
     
     // Deleting acceptor should clean up resources

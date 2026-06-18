@@ -10,11 +10,12 @@
 
 #if PLATFORM_WINDOWS
 
+#include "hope-io/net/win/udp_sender_impl.h"
 #include "hope-io/net/factory.h"
 
 namespace hope::io {
 
-    udp_receiver* create_udp_receiver(unsigned long long socket) {
+    udp_sender* create_udp_sender(unsigned long long) {
         return nullptr;
     }
 

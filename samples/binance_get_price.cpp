@@ -3,7 +3,7 @@
 #include <cstring>
 
 #include "hope-io/net/tls/tls_init.h"
-#include "hope-io/net/tls/tls_stream.h"
+#include "hope-io/net/factory.h"
 
 int main() {
     hope::io::init_tls();

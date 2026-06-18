@@ -19,7 +19,7 @@
 hope::io::coro_task<> async_echo_client(const std::string& server_ip, std::size_t port) {
     hope::io::init();
 
-    auto* tcp_stream = hope::io::create_stream();
+    auto* tcp_stream = new hope::io::tcp_stream();
     hope::io::async_stream stream(tcp_stream);
 
     try {
@@ -50,7 +50,7 @@ hope::io::coro_task<> async_echo_client(const std::string& server_ip, std::size_
 
 // Example coroutine demonstrating multiple async operations
 hope::io::coro_task<> async_multi_message_client(const std::string& server_ip, std::size_t port) {
-    auto* tcp_stream = hope::io::create_stream();
+    auto* tcp_stream = new hope::io::tcp_stream();
     hope::io::async_stream stream(tcp_stream);
 
     try {

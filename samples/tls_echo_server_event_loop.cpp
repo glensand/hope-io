@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 
     try {
         // Create TLS acceptor (wraps TCP acceptor, adds TLS layer)
-        auto* tls_acceptor = hope::io::create_tls_acceptor(key_path, cert_path);
+        auto* tls_acceptor = new hope::io::tls_acceptor_impl(key_path, cert_path);
         tls_acceptor->open(port);
 
         std::cout << "TLS Event Loop Server started on port " << port << std::endl;
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
             conn.set_state(hope::io::event_loop::connection_state::die);
         };
 
-        auto* event_loop = hope::io::create_event_loop();
+        auto* event_loop = new hope::io::event_loop_impl();
         g_event_loop = event_loop;
 
         // Run event loop in a separate thread so we can stop it from main

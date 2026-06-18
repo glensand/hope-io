@@ -24,7 +24,7 @@ using namespace std::chrono_literals;
 class WriteVTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        acceptor = hope::io::create_acceptor();
+        acceptor = new hope::io::tcp_acceptor();
         acceptor->open(test_port);
     }
 
@@ -56,7 +56,7 @@ TEST_F(WriteVTest, SingleBuffer) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     std::span<const char> buf{msg.data(), msg.size()};
@@ -89,7 +89,7 @@ TEST_F(WriteVTest, MultipleBuffers) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     std::span<const char> b1{s1.data(), s1.size()};
@@ -120,7 +120,7 @@ TEST_F(WriteVTest, EmptyBuffers) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     // Empty write_v — no data sent, connection stays open
@@ -156,7 +156,7 @@ TEST_F(WriteVTest, WithEmptySpans) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     std::span<const char> b1{s1.data(), s1.size()};
@@ -195,7 +195,7 @@ TEST_F(WriteVTest, ManyBuffers) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client = hope::io::create_stream();
+    auto* client = new hope::io::tcp_stream();
     client->connect("127.0.0.1", test_port);
 
     std::vector<std::span<const char>> bufs;
@@ -233,7 +233,7 @@ TEST_F(WriteVTest, ConsistencyWithWrite) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client1 = hope::io::create_stream();
+    auto* client1 = new hope::io::tcp_stream();
     client1->connect("127.0.0.1", test_port);
 
     std::span<const char> b1{s1.data(), s1.size()};
@@ -258,7 +258,7 @@ TEST_F(WriteVTest, ConsistencyWithWrite) {
 
     std::this_thread::sleep_for(50ms);
 
-    auto* client2 = hope::io::create_stream();
+    auto* client2 = new hope::io::tcp_stream();
     client2->connect("127.0.0.1", test_port);
     client2->write(expected.data(), expected.size());
     client2->disconnect();
