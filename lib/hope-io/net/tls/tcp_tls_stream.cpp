@@ -180,6 +180,16 @@ namespace {
                 SSL_CTX_set_session_cache_mode(c,
                     SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
                 SSL_CTX_sess_set_cache_size(c, 128);
+
+                // Optimise for speed: prefer ECDHE over DHE, prefer X25519
+                SSL_CTX_set_cipher_list(c,
+                    "TLS_AES_128_GCM_SHA256:"
+                    "TLS_AES_256_GCM_SHA384:"
+                    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+                    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+                    "ECDHE-RSA-AES128-GCM-SHA256:"
+                    "ECDHE-RSA-AES256-GCM-SHA384");
+                SSL_CTX_set1_curves_list(c, "X25519:prime256v1:secp384r1");
             }
             return c;
         }();

@@ -115,6 +115,16 @@ namespace hope::io {
         SSL_CTX_set_session_cache_mode(m_ctx, SSL_SESS_CACHE_SERVER);
         SSL_CTX_sess_set_cache_size(m_ctx, 128);
 
+        // Optimise for speed: prefer ECDHE over DHE, prefer X25519
+        SSL_CTX_set_cipher_list(m_ctx,
+            "TLS_AES_128_GCM_SHA256:"
+            "TLS_AES_256_GCM_SHA384:"
+            "ECDHE-ECDSA-AES128-GCM-SHA256:"
+            "ECDHE-ECDSA-AES256-GCM-SHA384:"
+            "ECDHE-RSA-AES128-GCM-SHA256:"
+            "ECDHE-RSA-AES256-GCM-SHA384");
+        SSL_CTX_set1_curves_list(m_ctx, "X25519:prime256v1:secp384r1");
+
         m_listen_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (m_listen_socket == -1) {
             SSL_CTX_free(m_ctx);
