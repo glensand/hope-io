@@ -240,14 +240,14 @@ namespace hope::io {
                 m_tls_states.resize(sock + 1);
             }
 
-									            int ret = SSL_do_handshake(ssl);
-									            if (ret == 1) {
-									                register_connection(sock, ssl, cb);
-									                cb.on_connect(m_connections[sock]);
-									                // Drain any application data that arrived during the handshake
-									                // (edge-triggered epoll won't fire EPOLLIN again for it).
-									                handle_read(m_connections[sock], cb);
-									            } else {
+            int ret = SSL_do_handshake(ssl);
+            if (ret == 1) {
+                register_connection(sock, ssl, cb);
+                cb.on_connect(m_connections[sock]);
+                // Drain any application data that arrived during the handshake
+                // (edge-triggered epoll won't fire EPOLLIN again for it).
+                handle_read(m_connections[sock], cb);
+            } else {
                 int err = SSL_get_error(ssl, ret);
                 if (err == SSL_ERROR_WANT_READ) {
                     epoll_ctl_add(m_epfd, sock, EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLET, cb);
@@ -310,46 +310,46 @@ namespace hope::io {
         }
     }
 
-    	void tls_event_loop_impl::handle_read(event_loop::connection& conn, event_loop::callbacks& cb) {
-    		NAMED_SCOPE(TlsHandleRead);
-    		if (conn.get_state() != event_loop::connection_state::read) return;
+    void tls_event_loop_impl::handle_read(event_loop::connection& conn, event_loop::callbacks& cb) {
+        NAMED_SCOPE(TlsHandleRead);
+        if (conn.get_state() != event_loop::connection_state::read) return;
 
-    		auto& tls = m_tls_states[conn.descriptor];
-    		bool error = false;
-    		bool got_data = false;
+        auto& tls = m_tls_states[conn.descriptor];
+        bool error = false;
+        bool got_data = false;
 
-    		// Drain ALL available TLS records — SSL_read returns one TLS record at a time,
-    		// and edge-triggered epoll may not fire again for data already in the SSL buffer.
-    		while (true) {
-    			auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
-    				ERR_clear_error();
-    				int received = SSL_read(tls.ssl, data, (int)size);
-    				if (received > 0) {
-    					got_data = true;
-    					return (std::size_t)received;
-    				}
+        // Drain ALL available TLS records — SSL_read returns one TLS record at a time,
+        // and edge-triggered epoll may not fire again for data already in the SSL buffer.
+        while (true) {
+            auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                ERR_clear_error();
+                int received = SSL_read(tls.ssl, data, (int)size);
+                if (received > 0) {
+                    got_data = true;
+                    return (std::size_t)received;
+                }
 
-    				int err = SSL_get_error(tls.ssl, received);
-    				if (err == SSL_ERROR_WANT_READ) {
-    					return 0;
-    				}
-    				if (err == SSL_ERROR_ZERO_RETURN) {
-    					return 0;
-    				}
-    				error = true;
-    				return 0;
-    			});
+                int err = SSL_get_error(tls.ssl, received);
+                if (err == SSL_ERROR_WANT_READ) {
+                    return 0;
+                }
+                if (err == SSL_ERROR_ZERO_RETURN) {
+                    return 0;
+                }
+                error = true;
+                return 0;
+            });
 
-    			if (consumed == 0) break;
-    		}
+            if (consumed == 0) break;
+        }
 
-    		if (got_data && !error) {
-    			cb.on_read(conn);
-    		}
-    		if (error) {
-    			conn.set_state(event_loop::connection_state::die);
-    		}
-    	}
+        if (got_data && !error) {
+            cb.on_read(conn);
+        }
+        if (error) {
+            conn.set_state(event_loop::connection_state::die);
+        }
+    }
 
     void tls_event_loop_impl::handle_write(event_loop::connection& conn, event_loop::callbacks& cb) {
         NAMED_SCOPE(TlsHandleWrite);
