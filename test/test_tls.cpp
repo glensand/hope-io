@@ -11,11 +11,14 @@
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/factory.h"
 #include "hope-io/net/init.h"
+#include "hope-io/net/tls/tls_acceptor_impl.h"
 #include <thread>
 #include <chrono>
 #include <fstream>
 #include <sstream>
 #include <atomic>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 using namespace std::chrono_literals;
 
@@ -42,8 +45,14 @@ protected:
     
     // Helper to check if test certificates exist
     bool hasTestCertificates() {
-        // In a real test environment, you would check for certificate files
-        // For now, we'll skip TLS tests as they require proper setup
+        const char* paths[] = {
+            "test/certs/cert.pem",
+            "../test/certs/cert.pem",
+            "../../test/certs/cert.pem",
+        };
+        for (auto* p : paths) {
+            if (fs::exists(p)) return true;
+        }
         return false;
     }
 };
@@ -53,11 +62,25 @@ TEST_F(TlsTest, CreateTlsAcceptor) {
     if (!hasTestCertificates()) {
         GTEST_SKIP() << "TLS test certificates not available";
     }
-    
-    // This would require actual certificate files
-    // auto* acceptor = new hope::io::tls_acceptor_impl("key.pem", "cert.pem");
-    // ASSERT_NE(acceptor, nullptr);
-    // delete acceptor;
+
+    std::string key_path, cert_path;
+    const char* search[] = {
+        "../test/certs/key.pem",  "../../test/certs/key.pem",
+        "test/certs/key.pem",
+    };
+    for (auto* p : search) {
+        if (fs::exists(p)) {
+            auto base = std::string(p);
+            auto pos = base.find("key.pem");
+            key_path = base;
+            cert_path = base.substr(0, pos) + "cert.pem";
+            break;
+        }
+    }
+    auto* acceptor = new hope::io::tls_acceptor_impl(key_path, cert_path);
+    ASSERT_NE(acceptor, nullptr);
+    acceptor->open(test_port);
+    delete acceptor;
 }
 
 // Test TLS stream creation

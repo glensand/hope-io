@@ -56,6 +56,7 @@ namespace hope::io {
 
     event_loop_impl::~event_loop_impl() {
         event_loop::connection::on_state_changed = nullptr;
+        m_pl.drain();
     }
 
     event_loop::fixed_size_buffer* event_loop_impl::buffer_pool::allocate() {
@@ -220,8 +221,9 @@ namespace hope::io {
 
     void event_loop_impl::push_new_connection(int32_t fd) {
         NAMED_SCOPE(PushNewConnection);
-        assert(fd < m_connections.size());
-        assert(m_connections[fd].buffer == nullptr);
+        if ((std::size_t)fd >= m_connections.size()) {
+            m_connections.resize(fd + 1);
+        }
         m_connections[fd].descriptor = fd;
         m_connections[fd].buffer = m_pl.allocate();
     }

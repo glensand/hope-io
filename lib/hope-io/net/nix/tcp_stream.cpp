@@ -98,7 +98,11 @@ namespace hope::io {
         }
         return recv_bytes;
     }
-    size_t tcp_stream::read_once(void* data, std::size_t length) { return recv(m_socket, (char*)data, length, 0); }
+    size_t tcp_stream::read_once(void* data, std::size_t length) {
+        auto received = recv(m_socket, (char*)data, length, 0);
+        if (received < 0) return 0;
+        return (std::size_t)received;
+    }
     void tcp_stream::stream_in(std::string& buffer) { assert(false && "Not implemented"); }
     void tcp_stream::set_options(const hope::io::stream_options& opt) {
         HOPE_ASSERT(m_socket >= 0, "tcp_stream: set_options() called before connect()");

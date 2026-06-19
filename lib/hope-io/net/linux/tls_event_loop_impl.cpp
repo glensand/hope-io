@@ -44,6 +44,18 @@ namespace hope::io {
             NAMED_SCOPE(TlsSetState);
             if (conn.get_state() == event_loop::connection_state::die) {
                 remove_connection(conn.descriptor);
+            } else {
+                // Re-arm epoll with the correct event interest for the new state.
+                // Edge-triggered (EPOLLET) means we must re-arm when the state transitions.
+                epoll_event ev;
+                ev.data.fd = conn.descriptor;
+                ev.events = EPOLLRDHUP | EPOLLHUP | EPOLLET;
+                if (conn.get_state() == event_loop::connection_state::read) {
+                    ev.events |= EPOLLIN;
+                } else if (conn.get_state() == event_loop::connection_state::write) {
+                    ev.events |= EPOLLOUT;
+                }
+                epoll_ctl(m_epfd, EPOLL_CTL_MOD, conn.descriptor, &ev);
             }
         };
     }
@@ -53,6 +65,8 @@ namespace hope::io {
         if (m_ctx) {
             SSL_CTX_free(m_ctx);
         }
+        // Free any remaining prepooled/redeemed buffers
+        m_pl.drain();
     }
 
     event_loop::fixed_size_buffer* tls_event_loop_impl::buffer_pool::allocate() {
@@ -218,6 +232,14 @@ namespace hope::io {
             SSL_set_fd(ssl, sock);
             SSL_set_accept_state(ssl);
 
+            // Ensure vectors are large enough for this fd
+            if ((std::size_t)sock >= m_connections.size()) {
+                m_connections.resize(sock + 1);
+            }
+            if ((std::size_t)sock >= m_tls_states.size()) {
+                m_tls_states.resize(sock + 1);
+            }
+
             int ret = SSL_do_handshake(ssl);
             if (ret == 1) {
                 register_connection(sock, ssl, cb);
@@ -262,8 +284,12 @@ namespace hope::io {
     void tls_event_loop_impl::register_connection(int32_t sock, SSL* ssl, event_loop::callbacks&) {
         NAMED_SCOPE(TlsRegisterConn);
         auto& tls = m_tls_states[sock];
-        HOPE_ASSERT(tls.ssl == nullptr, "tls_event_loop: double register");
-        tls.ssl = ssl;
+        // ssl may already be set if the handshake was deferred (SSL_ERROR_WANT_READ in handle_accept).
+        if (tls.ssl) {
+            // Already set from the pending handshake path — nothing to do.
+        } else {
+            tls.ssl = ssl;
+        }
 
         auto& conn = connection_for_fd(sock);
         conn.descriptor = sock;
@@ -272,7 +298,11 @@ namespace hope::io {
         epoll_event ev;
         ev.events = EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP | EPOLLET;
         ev.data.fd = sock;
-        epoll_ctl(m_epfd, EPOLL_CTL_MOD, sock, &ev);
+        // Socket may already be in epoll (from a pending handshake) or not yet added
+        // (from an immediate handshake success). Try ADD first; if EEXIST, use MOD.
+        if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, sock, &ev) == -1 && errno == EEXIST) {
+            epoll_ctl(m_epfd, EPOLL_CTL_MOD, sock, &ev);
+        }
     }
 
     void tls_event_loop_impl::handle_read(event_loop::connection& conn, event_loop::callbacks& cb) {
@@ -351,8 +381,10 @@ namespace hope::io {
     }
 
     event_loop::connection& tls_event_loop_impl::connection_for_fd(int32_t fd) {
-        HOPE_ASSERT(fd >= 0 && fd < (int32_t)m_connections.size(),
-                    "tls_event_loop: fd out of range");
+        if ((std::size_t)fd >= m_connections.size()) {
+            m_connections.resize(fd + 1);
+            m_tls_states.resize(fd + 1);
+        }
         return m_connections[fd];
     }
 

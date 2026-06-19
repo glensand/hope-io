@@ -46,7 +46,7 @@ int main() {
 struct bench_config {
     std::string mode        = "tcp";
     size_t      payload     = 1024;
-    int         connections = 50;
+    int         connections = 40;
     int         duration_s  = 5;
     int         warmup_s    = 2;
     int         port        = 19300;
@@ -167,16 +167,16 @@ static void run_server(const bench_config& cfg, server_guard& sg) {
         scfg.port       = cfg.port;
         scfg.cert_path  = cfg.cert_path;
         scfg.key_path   = cfg.key_path;
-        scfg.max_mutual_connections = cfg.connections + 10;
-        scfg.max_accepts_per_tick   = 128;
+        scfg.max_mutual_connections = 10000;
+        scfg.max_accepts_per_tick   = 1000;
         scfg.epoll_timeout = 1000;
         sg.start(true, loop, std::move(scfg), std::move(cb));
     } else {
         auto* loop = hope::io::create_event_loop();
         hope::io::event_loop::config ecfg;
         ecfg.port        = cfg.port;
-        ecfg.max_mutual_connections = cfg.connections + 10;
-        ecfg.max_accepts_per_tick   = 128;
+        ecfg.max_mutual_connections = 10000;
+        ecfg.max_accepts_per_tick   = 1000;
         ecfg.epoll_temeout = 1000;
         sg.start(false, loop, std::move(ecfg), std::move(cb));
     }

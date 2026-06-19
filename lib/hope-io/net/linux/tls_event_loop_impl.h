@@ -40,6 +40,10 @@ namespace hope::io {
             event_loop::fixed_size_buffer* allocate();
             void redeem(event_loop::fixed_size_buffer* b);
             void prepool(std::size_t count);
+            void drain() {
+                for (auto* buf : m_impl) delete buf;
+                m_impl.clear();
+            }
         private:
             std::deque<event_loop::fixed_size_buffer*> m_impl;
         };
