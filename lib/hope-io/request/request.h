@@ -10,7 +10,13 @@
 
 #include <filesystem>
 
-#include "hope-io/net/factory.h"
+#include "hope-io/coredefs.h"
+#if PLATFORM_LINUX || PLATFORM_APPLE
+#include "hope-io/net/nix/tcp_stream.h"
+#elif PLATFORM_WINDOWS
+#include "hope-io/net/win/tcp_stream.h"
+#endif
+#include "hope-io/net/tls/tcp_tls_stream.h"
 #include "hope-io/net/stream.h"
 #include <format>
 #include <fstream>

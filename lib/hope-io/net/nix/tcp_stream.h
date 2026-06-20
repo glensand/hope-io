@@ -16,7 +16,8 @@ namespace hope::io {
 
     class tcp_stream final : public stream {
     public:
-        explicit tcp_stream(unsigned long long in_socket = static_cast<unsigned long long>(-1));
+        explicit tcp_stream(unsigned long long in_socket = static_cast<unsigned long long>(-1),
+                            const stream_options& opts = stream_options{});
         virtual ~tcp_stream() override;
 
         [[nodiscard]] std::string get_endpoint() const override;
@@ -39,7 +40,10 @@ namespace hope::io {
         using stream::read;
 
     private:
+        void apply_constructor_options();
+
         int m_socket{ -1 };
+        stream_options m_options;
     };
 
 }

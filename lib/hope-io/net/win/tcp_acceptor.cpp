@@ -11,8 +11,8 @@
 #if PLATFORM_WINDOWS
 
 #include "hope-io/net/win/tcp_acceptor.h"
+#include "hope-io/net/win/tcp_stream.h"
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
 #include "hope-io/net/init.h"
 
 #undef UNICODE
@@ -30,6 +30,9 @@
 #pragma comment (lib, "Ws2_32.lib")
 
 namespace hope::io {
+
+    tcp_acceptor::tcp_acceptor(const stream_options& opts)
+        : m_options(opts) {}
 
     tcp_acceptor::~tcp_acceptor() {
         closesocket(m_listen_socket);
@@ -55,6 +58,20 @@ namespace hope::io {
             throw std::runtime_error("hope-io/win_acceptor: Cannot create socket");
         }
 
+        // Apply pre-bind socket options
+        if (m_options.tcp_nodelay) {
+            int on = 1;
+            setsockopt(m_listen_socket, IPPROTO_TCP, TCP_NODELAY, (const char*)&on, sizeof(on));
+        }
+        if (m_options.reuse_address) {
+            int on = 1;
+            setsockopt(m_listen_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
+        }
+        if (m_options.send_buffer_size > 0)
+            setsockopt(m_listen_socket, SOL_SOCKET, SO_SNDBUF, (const char*)&m_options.send_buffer_size, sizeof(m_options.send_buffer_size));
+        if (m_options.recv_buffer_size > 0)
+            setsockopt(m_listen_socket, SOL_SOCKET, SO_RCVBUF, (const char*)&m_options.recv_buffer_size, sizeof(m_options.recv_buffer_size));
+
         if (const auto bound = bind(m_listen_socket, result->ai_addr, (int)result->ai_addrlen); bound == SOCKET_ERROR) {
             freeaddrinfo(result);
             closesocket(m_listen_socket);
@@ -74,19 +91,18 @@ namespace hope::io {
             throw std::runtime_error("hope-io/win_acceptor: accept failed");
         }
 
-        return new tcp_stream(new_socket);
+        return new tcp_stream(new_socket, m_options);
     }
 
     long long tcp_acceptor::raw() const {
         return m_listen_socket;
     }
 
-    void tcp_acceptor::set_options(const stream_options&) {
-        // TODO:: implement
+    void tcp_acceptor::set_options(const stream_options& opt) {
+        m_options = opt;
     }
 
 
 
 }
-
 #endif

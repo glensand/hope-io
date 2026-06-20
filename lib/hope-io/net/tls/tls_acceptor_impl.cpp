@@ -8,21 +8,27 @@
 
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
 #include "hope-io/net/tls/tls_server_stream.h"
 #include "hope-io/net/tls/tls_acceptor_impl.h"
+#include "hope-io/net/tls/ktls_enable.h"
+
+#if PLATFORM_LINUX || PLATFORM_APPLE
+#include "hope-io/net/nix/tcp_acceptor.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#elif PLATFORM_WINDOWS
+#include "hope-io/net/win/tcp_acceptor.h"
+#include "hope-io/net/win/tcp_stream.h"
+#endif
 #include <array>
 #include <unistd.h>
 
-#ifdef HOPE_IO_USE_OPENSSL
-
 namespace hope::io {
 
-    tls_server_stream::tls_server_stream(tcp_stream* tcp_stream, SSL_CTX* context)
-        : base_tls_stream(tcp_stream) {
+    tls_server_stream::tls_server_stream(tcp_stream* tcp_stream, SSL_CTX* context, const stream_options& opts)
+        : base_tls_stream(tcp_stream, opts) {
         m_context = context;
     }
 
@@ -42,11 +48,17 @@ namespace hope::io {
         if (SSL_accept(m_ssl) <= 0) {
             throw std::runtime_error("hope-io/tls_server_stream: cannot accept tls connection");
         }
+
+        // Attempt KTLS after successful handshake
+        if (m_ktls_enabled) {
+            try_enable_ktls();
+        }
     }
 
-    tls_acceptor_impl::tls_acceptor_impl(std::string_view key, std::string_view cert)
+    tls_acceptor_impl::tls_acceptor_impl(std::string_view key, std::string_view cert, const stream_options& opts)
         : m_key(key.data())
-        , m_cert(cert.data()) {
+        , m_cert(cert.data())
+        , m_opts(opts) {
         init_tls();
     }
 
@@ -66,7 +78,7 @@ namespace hope::io {
              throw std::runtime_error("hope-io/tls_acceptor: cannot create key");
         }
 
-        m_tcp_acceptor = new tcp_acceptor;
+        m_tcp_acceptor = new tcp_acceptor(m_opts);
         m_tcp_acceptor->open(port);
     }
 
@@ -78,13 +90,15 @@ namespace hope::io {
 
     stream* tls_acceptor_impl::accept() {
         auto* tcp = m_tcp_acceptor->accept();
-        auto* tls_stream = new tls_server_stream(static_cast<tcp_stream*>(tcp), m_context);
+        auto* tls_stream = new tls_server_stream(static_cast<tcp_stream*>(tcp), m_context, m_opts);
+        tls_stream->set_ktls_enabled(m_ktls_enabled);
         tls_stream->accept_tls();
         return tls_stream;
     }
 
     void tls_acceptor_impl::set_options(const stream_options& opt) {
         assert(m_tcp_acceptor);
+        m_opts = opt;
         m_tcp_acceptor->set_options(opt);
     }
 
@@ -92,12 +106,4 @@ namespace hope::io {
         return m_tcp_acceptor->raw();
     }
 
-
-
 }
-
-#else
-
-
-
-#endif

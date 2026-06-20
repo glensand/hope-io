@@ -14,7 +14,6 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/tls/tls_init.h"
-#include "hope-io/net/factory.h"
 
 #include "openssl/ssl.h"
 #include "openssl/err.h"
@@ -32,8 +31,70 @@
 #include <sys/event.h>
 #include <sys/time.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 
 namespace hope::io {
+
+namespace {
+
+void apply_stream_options(int fd, const stream_options& opt) {
+    if (opt.tcp_nodelay) {
+        int on = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    }
+
+    if (opt.keepalive) {
+        int on = 1;
+        setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+    }
+
+#ifdef TCP_KEEPIDLE
+    if (opt.keepidle >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &opt.keepidle, sizeof(opt.keepidle));
+    }
+#endif
+
+#ifdef TCP_KEEPINTVL
+    if (opt.keepintvl >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &opt.keepintvl, sizeof(opt.keepintvl));
+    }
+#endif
+
+#ifdef TCP_KEEPCNT
+    if (opt.keepcnt >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &opt.keepcnt, sizeof(opt.keepcnt));
+    }
+#endif
+
+    if (opt.send_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &opt.send_buffer_size, sizeof(opt.send_buffer_size));
+    }
+
+    if (opt.recv_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &opt.recv_buffer_size, sizeof(opt.recv_buffer_size));
+    }
+
+    if (opt.linger_on) {
+        struct linger l;
+        l.l_onoff = opt.linger_on;
+        l.l_linger = opt.linger_seconds;
+        setsockopt(fd, SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+    }
+
+#ifdef IP_TTL
+    if (opt.ttl >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TTL, &opt.ttl, sizeof(opt.ttl));
+    }
+#endif
+
+#ifdef IP_TOS
+    if (opt.tos >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &opt.tos, sizeof(opt.tos));
+    }
+#endif
+}
+
+} // anonymous namespace
 
     event_loop::fixed_size_buffer* tls_event_loop_impl::buffer_pool::allocate() {
         event_loop::fixed_size_buffer* allocated = nullptr;
@@ -222,6 +283,8 @@ namespace hope::io {
                 ::close(sock);
                 continue;
             }
+
+            apply_stream_options(sock, m_cfg.accepted_stream_options);
 
             SSL* ssl = SSL_new(m_ctx);
             if (!ssl) {

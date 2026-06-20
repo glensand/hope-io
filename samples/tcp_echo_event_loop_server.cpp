@@ -9,7 +9,7 @@
 #include "message.h"
 
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/linux/event_loop_impl.h"
 #include "hope-io/net/init.h"
 
 #include <iostream>
@@ -35,29 +35,29 @@ int main(int argc, char *argv[]) {
         hope::io::event_loop::callbacks callbacks;
 
         callbacks.on_connect = [](hope::io::event_loop::connection& conn) {
-            std::cout << "[CONNECT] New connection from: " << conn.get_endpoint() << std::endl;
+            std::cout << "[CONNECT] New connection fd: " << conn.descriptor << std::endl;
             conn.set_state(hope::io::event_loop::connection_state::read);
         };
 
         callbacks.on_read = [](hope::io::event_loop::connection& conn) {
             // Print what we received
             const auto& buffer = conn.buffer;
-            const auto chunk = buffer->used_chunk();
-            std::cout << "[READ] Received " << chunk.second << " bytes from " << conn.get_endpoint() << std::endl;
+            const auto chunk = buffer->peek_used();
+            std::cout << "[READ] Received " << chunk.second << " bytes from fd " << conn.descriptor << std::endl;
             
             // Echo back the data: change to write state
             conn.set_state(hope::io::event_loop::connection_state::write);
         };
 
         callbacks.on_write = [](hope::io::event_loop::connection& conn) {
-            std::cout << "[WRITE] Echoed data to: " << conn.get_endpoint() << std::endl;
+            std::cout << "[WRITE] Echoed data to fd: " << conn.descriptor << std::endl;
             
             // Go back to read state for more data
             conn.set_state(hope::io::event_loop::connection_state::read);
         };
 
         callbacks.on_err = [](hope::io::event_loop::connection& conn, const std::string& error) {
-            std::cout << "[ERROR] Connection " << conn.get_endpoint() << ": " << error << std::endl;
+            std::cout << "[ERROR] Connection fd " << conn.descriptor << ": " << error << std::endl;
             conn.set_state(hope::io::event_loop::connection_state::die);
         };
 

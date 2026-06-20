@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hope-io/net/event_loop.h"
+#include "hope-io/net/stream.h"
 #include <string>
 
 namespace hope::io {
@@ -23,6 +24,8 @@ namespace hope::io {
             std::size_t max_accepts_per_tick = 128;
             int epoll_timeout = 1000;            // ms
             bool verify_peer = false;            // optional mTLS
+            bool enable_ktls = false;            // attempt KTLS on each accepted connection
+            stream_options accepted_stream_options;  // socket options applied to each accepted connection
         };
 
         virtual ~tls_event_loop() = default;

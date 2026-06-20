@@ -17,11 +17,38 @@
 namespace hope::io {
 
     struct stream_options final {
-        uint32_t connection_timeout = 3000; // msec
-        uint32_t read_timeout = 3000; // msec
-        uint32_t write_timeout = 3000; // msec
-        uint32_t write_buffer_size = 8096; // bytes
-        bool non_block_mode = false;
+        // ── Connection / timeout ──────────────────────────────
+        uint32_t connection_timeout = 3000;  // msec
+        uint32_t read_timeout = 3000;        // msec: SO_RCVTIMEO
+        uint32_t write_timeout = 3000;       // msec: SO_SNDTIMEO
+        bool non_block_mode = false;         // O_NONBLOCK via fcntl/ioctlsocket
+
+        // ── TCP-level (IPPROTO_TCP) ────────────────────────────
+        bool   tcp_nodelay          = true;    // TCP_NODELAY — disable Nagle
+        int    tcp_user_timeout     = -1;      // TCP_USER_TIMEOUT msec (Linux, -1=off)
+
+        // ── Keepalive (SOL_SOCKET + TCP_KEEP*) ─────────────────
+        bool   keepalive            = false;   // SO_KEEPALIVE
+        int    keepidle             = -1;      // TCP_KEEPIDLE sec (-1=sysctl default)
+        int    keepintvl            = -1;      // TCP_KEEPINTVL sec
+        int    keepcnt              = -1;      // TCP_KEEPCNT probes
+
+        // ── Socket buffer (SOL_SOCKET) ─────────────────────────
+        int    send_buffer_size     = -1;      // SO_SNDBUF bytes (-1=leave default)
+        int    recv_buffer_size     = -1;      // SO_RCVBUF bytes (-1=leave default)
+
+        // ── Socket behavior (SOL_SOCKET) ───────────────────────
+        bool   reuse_address        = true;    // SO_REUSEADDR
+        bool   reuse_port           = false;   // SO_REUSEPORT (Linux)
+        int    linger_on              = 0;       // SO_LINGER: enable (0=off, 1=on)
+        int    linger_seconds         = 0;       // SO_LINGER: timeout in seconds
+        int    priority             = -1;      // SO_PRIORITY (-1=leave default)
+
+        // ── IP-level (IPPROTO_IP) ──────────────────────────────
+        int    ttl                  = -1;      // IP_TTL (-1=leave default)
+        int    tos                  = -1;      // IP_TOS / DSCP field (-1=leave default)
+        int    mark                 = -1;      // SO_MARK — socket mark for policy routing
+        std::string bind_device;               // SO_BINDTODEVICE — bind to interface name
     };
 
     // TODO:: need to split streams somehow, add sync/async versions

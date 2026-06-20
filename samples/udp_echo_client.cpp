@@ -9,7 +9,8 @@
 #include "message.h"
 
 #include "hope-io/net/udp_builder.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/udp_sender_impl.h"
+#include "hope-io/net/nix/udp_receiver_impl.h"
 #include "hope-io/net/init.h"
 
 #include <iostream>

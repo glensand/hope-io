@@ -6,11 +6,18 @@
  * this file. If not, please write to: bezborodoff.gleb@gmail.com, or visit : https://github.com/glensand/daedalus-proto-lib
  */
 
-#include "hope-io/net/factory.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/acceptor.h"
-#include "hope-io/net/factory.h"
+#if PLATFORM_LINUX
+#include "hope-io/net/linux/event_loop_impl.h"
+#endif
+#if PLATFORM_APPLE
+#include "hope-io/net/nix/event_loop_impl.h"
+#endif
+#if PLATFORM_WINDOWS
+#include "hope-io/net/win/event_loop_impl.h"
+#endif
 #include "hope-io/net/init.h"
 #include "hope-io/coredefs.h"
 
@@ -56,10 +63,8 @@ void on_err(hope::io::event_loop::connection& c, const std::string& what) {
 std::thread worker;
 
 int main() {
-    PROFILER_INIT
     hope::io::init();
     auto* loop = new hope::io::event_loop_impl();
-    PROFILER_START_LISTEN
     try {
         hope::io::event_loop::callbacks cb{
             [](auto& c) {

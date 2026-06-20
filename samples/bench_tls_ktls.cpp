@@ -2,22 +2,18 @@
  * You may use, distribute and modify this code under the
  * terms of the MIT license.
  *
- * ── Raw TLS Echo Latency Benchmark ───────────────────────────────
+ * ── KTLS Echo Latency Benchmark ─────────────────────────────────────
  *
- * Raw POSIX sockets + raw TLS API (BoringSSL). TLS 1.3 forced.
- * Supports tuning variant presets to measure TCP/TLS parameter
- * impact on latency.
+ * Copy of bench_tls_raw using BoringSSL TLS 1.2 + kernel KTLS.
+ * Handshake with BoringSSL, extract keys via SSL_generate_key_block,
+ * program KTLS via setsockopt(TCP_ULP), then raw read/write.
+ *
+ * Socket settings: TCP_NODELAY + SO_SNDBUF=262144 + SO_RCVBUF=262144.
  *
  * Compile:
- *   g++ -O3 -Ilib/boringssl/include -Ilib bench_tls_raw.cpp \
- *       build/lib/boringssl/libssl.a build/lib/boringssl/libcrypto.a -lpthread
- *
- * Usage:
- *   ./bench_tls_raw [-n iterations] [-p port] [-w warmup] [-V variant]
- *                   [-s size1,size2,...]
- *
- * Example:
- *   ./bench_tls_raw -n 50000 -V 3 -s 200,4096
+ *   g++ -O3 -Ilib/boringssl/include -Ilib bench_tls_ktls.cpp \
+ *       build/lib/boringssl/libssl.a build/lib/boringssl/libcrypto.a \
+ *       -lpthread -o build/bin/bench_tls_ktls
  */
 
 #include <cstdio>
@@ -40,11 +36,11 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <sched.h>
-
 #include <linux/tls.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/hkdf.h>
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -52,32 +48,9 @@ static constexpr size_t MAX_SAMPLES     = 8u << 20;
 static constexpr int    DEFAULT_PORT    = 14443;
 static constexpr int    DEFAULT_ITER    = 50000;
 static constexpr int    DEFAULT_WARMUP  = 2000;
-static constexpr int    DEFAULT_VARIANT = 3;   // bigbufs (TCP_NODELAY + both buffers)
 
 static constexpr int DEFAULT_SIZES[]    = { 64, 200, 1024, 4096, 16384, 65536 };
 static constexpr int DEFAULT_NUM_SIZES  = 6;
-
-// ── Variant description table ─────────────────────────────────────────
-
-struct variant_desc {
-    int     id;
-    const char* name;
-    const char* desc;
-};
-
-static constexpr variant_desc VARIANTS[] = {
-    { 0,  "baseline",      "TCP_NODELAY, no extra opts" },
-    { 1,  "rcvbuf",        "SO_RCVBUF=262144 both sides (best)" },
-    { 2,  "sndbuf",        "SO_SNDBUF=262144 both sides" },
-    { 3,  "bigbufs",       "SO_RCVBUF+SO_SNDBUF=262144" },
-    { 4,  "ssl_modes",     "PARTIAL_WRITE+MOVING_WRITE+AUTO_RETRY" },
-    { 5,  "read_ahead",    "SSL_set_read_ahead(ssl, 1)" },
-    { 6,  "nodelay_off",   "TCP_NODELAY off (Nagle on)" },
-    { 7,  "best_combo",    "bigbufs+ssl_modes+read_ahead" },
-    { 8,  "pin_cores",     "thread affinity: server/core0 client/core1" },
-    { 9,  "pin_rcvbuf",    "pin_cores + SO_RCVBUF=262144" },
-};
-static constexpr int NUM_VARIANTS = 10;
 
 // ── Clock ─────────────────────────────────────────────────────────────
 
@@ -95,7 +68,6 @@ struct alignas(64) sample_buf {
 
     explicit sample_buf(uint64_t cap = MAX_SAMPLES)
         : samples(new int64_t[cap]), capacity(cap) {}
-
     ~sample_buf() { delete[] samples; }
 
     sample_buf(const sample_buf&) = delete;
@@ -119,7 +91,6 @@ struct config {
     int            port        = DEFAULT_PORT;
     uint64_t       iterations  = DEFAULT_ITER;
     uint64_t       warmup      = DEFAULT_WARMUP;
-    int            variant     = DEFAULT_VARIANT;
     std::vector<size_t> sizes;
 };
 
@@ -140,12 +111,6 @@ static config parse_args(int argc, char** argv) {
             cfg.port = std::stoi(next());
         } else if (a == "-w" || a == "--warmup") {
             cfg.warmup = (uint64_t)std::stol(next());
-        } else if (a == "-V" || a == "--variant") {
-            cfg.variant = std::stoi(next());
-            if (cfg.variant < 0 || cfg.variant >= NUM_VARIANTS) {
-                fprintf(stderr, "variant must be 0-%d\n", NUM_VARIANTS - 1);
-                exit(1);
-            }
         } else if (a == "-s" || a == "--sizes") {
             cfg.sizes.clear();
             auto s = next();
@@ -157,11 +122,6 @@ static config parse_args(int argc, char** argv) {
                 if (comma == std::string::npos) break;
                 pos = comma + 1;
             }
-        } else if (a == "--list-variants") {
-            printf("Variants:\n");
-            for (int i = 0; i < NUM_VARIANTS; ++i)
-                printf("  %2d  %-16s  %s\n", VARIANTS[i].id, VARIANTS[i].name, VARIANTS[i].desc);
-            exit(0);
         } else {
             fprintf(stderr, "unknown arg: %s\n", a.c_str());
             exit(1);
@@ -179,19 +139,19 @@ static void pin_current_thread(int core_id) {
     pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
 }
 
-// ── POSIX helpers ─────────────────────────────────────────────────────
+// ── Socket helpers (hardcoded variant 3: bigbufs) ─────────────────────
 
-static void apply_sockopts(int fd, int variant) {
+static void apply_sockopts(int fd) {
     int opt = 1;
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 }
 
-static int tcp_listen(int port, int variant) {
+static int tcp_listen(int port) {
     int fd = (int)socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) { perror("socket"); exit(1); }
     int opt = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    apply_sockopts(fd, variant);
+    apply_sockopts(fd);
     struct sockaddr_in addr{};
     addr.sin_family      = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -201,10 +161,10 @@ static int tcp_listen(int port, int variant) {
     return fd;
 }
 
-static int tcp_connect(const char* ip, int port, int variant) {
+static int tcp_connect(const char* ip, int port) {
     int fd = (int)socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) { perror("socket"); exit(1); }
-    apply_sockopts(fd, variant);
+    apply_sockopts(fd);
     struct sockaddr_in addr{};
     addr.sin_family      = AF_INET;
     addr.sin_port        = htons((uint16_t)port);
@@ -213,119 +173,95 @@ static int tcp_connect(const char* ip, int port, int variant) {
     return fd;
 }
 
-static int tcp_accept(int listen_fd, int variant) {
-    (void)variant;
+static int tcp_accept(int listen_fd) {
     struct sockaddr_in client_addr{};
     socklen_t addrlen = sizeof(client_addr);
     int fd = (int)accept(listen_fd, (struct sockaddr*)&client_addr, &addrlen);
     if (fd < 0) { perror("accept"); exit(1); }
-    // Apply socket options to accepted fd too
-    apply_sockopts(fd, variant);
+    apply_sockopts(fd);
     return fd;
 }
 
-// ── TLS helpers ────────────────────────────────────────────────────────
+// ── TLS helpers (BoringSSL + KTLS) ────────────────────────────────────
 
-// Write all bytes, handling partial writes
-static int ssl_write_all(SSL* ssl, const void* data, int len) {
-    int total = 0;
-    while (total < len) {
-        int r = SSL_write(ssl, (const char*)data + total, len - total);
-        if (r <= 0) return r;
-        total += r;
-    }
-    return total;
-}
-
-// Read exactly len bytes (loop to fill buffer)
-static int ssl_read_all(SSL* ssl, void* data, int len) {
-    int total = 0;
-    while (total < len) {
-        int r = SSL_read(ssl, (char*)data + total, len - total);
-        if (r <= 0) return r;
-        total += r;
-    }
-    return total;
-}
-
-static void apply_ssl_ctx_opts(SSL_CTX* ctx, int variant) {
-    if (variant == 4 || variant == 7) {
-        SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
-        SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-        SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
-    }
-}
-
-static void apply_ssl_opts(SSL* ssl, int variant) {
-    if (variant == 5 || variant == 7) {
-        SSL_set_read_ahead(ssl, 1);
-    }
-}
-
-static SSL_CTX* create_server_ctx(int variant) {
-    auto* method = TLS_server_method();
-    auto* ctx = SSL_CTX_new(method);
+static SSL_CTX* create_server_ctx() {
+    auto* ctx = SSL_CTX_new(TLS_server_method());
     if (!ctx) { fprintf(stderr, "SSL_CTX_new failed\n"); exit(1); }
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
-    SSL_CTX_set_cipher_list(ctx, "AES128-GCM-SHA256");
     if (SSL_CTX_use_certificate_file(ctx, "test/certs/cert.pem", SSL_FILETYPE_PEM) <= 0)
         { fprintf(stderr, "cert failed\n"); exit(1); }
     if (SSL_CTX_use_PrivateKey_file(ctx, "test/certs/key.pem", SSL_FILETYPE_PEM) <= 0)
         { fprintf(stderr, "key failed\n"); exit(1); }
-    apply_ssl_ctx_opts(ctx, variant);
     return ctx;
 }
 
-static SSL_CTX* create_client_ctx(int variant) {
-    auto* method = TLS_client_method();
-    auto* ctx = SSL_CTX_new(method);
+static SSL_CTX* create_client_ctx() {
+    auto* ctx = SSL_CTX_new(TLS_client_method());
     if (!ctx) { fprintf(stderr, "SSL_CTX_new failed\n"); exit(1); }
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
-    SSL_CTX_set_cipher_list(ctx, "AES128-GCM-SHA256");
     SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
-    apply_ssl_ctx_opts(ctx, variant);
     return ctx;
 }
 
 // ── KTLS enable via key extraction + setsockopt ──────────────────────
 
+// Enable kernel TLS on fd after a successful TLS 1.2 handshake.
+// On the server: tx_key = server_write, rx_key = client_write.
+// On the client: tx_key = client_write, rx_key = server_write.
 static void enable_ktls(SSL* ssl, int fd, bool is_server, int payload_size) {
     (void)payload_size;
+
+    // Get key block length and allocate
     size_t key_len = SSL_get_key_block_len(ssl);
     std::vector<uint8_t> key_block(key_len);
     SSL_generate_key_block(ssl, key_block.data(), key_len);
 
-    uint8_t* cw_key = key_block.data() + 0;
-    uint8_t* sw_key = key_block.data() + 16;
-    uint8_t* cw_iv  = key_block.data() + 32;
-    uint8_t* sw_iv  = key_block.data() + 36;
+    // TLS 1.2 key block layout for AES-128-GCM (RFC 5246 §6.3):
+    //   client_write_key (16) | server_write_key (16) |
+    //   client_write_IV  (4)  | server_write_IV  (4)
+    // Total = 40 bytes
+    uint8_t* cw_key = key_block.data() + 0;    // client write key
+    uint8_t* sw_key = key_block.data() + 16;   // server write key
+    uint8_t* cw_iv  = key_block.data() + 32;   // client write IV (salt)
+    uint8_t* sw_iv  = key_block.data() + 36;   // server write IV (salt)
 
+    // Helper to populate crypto info for one direction
     auto make_info = [](struct tls12_crypto_info_aes_gcm_128* info,
-                        const uint8_t* key, const uint8_t* salt) {
+                        const uint8_t* key, const uint8_t* salt)
+    {
         memset(info, 0, sizeof(*info));
-        info->info.version = TLS1_2_VERSION;
-        info->info.cipher_type = TLS_CIPHER_AES_GCM_128;
+        info->info.version = TLS_1_2_VERSION;  // 0x0303
+        info->info.cipher_type = TLS_CIPHER_AES_GCM_128;  // 51
         memcpy(info->key, key, 16);
         memcpy(info->salt, salt, 4);
+        // iv = 0, rec_seq = 0 (memset above)
     };
 
     struct tls12_crypto_info_aes_gcm_128 tx_info, rx_info;
+
     if (is_server) {
-        make_info(&tx_info, sw_key, sw_iv);
-        make_info(&rx_info, cw_key, cw_iv);
+        make_info(&tx_info, sw_key, sw_iv);   // server TX
+        make_info(&rx_info, cw_key, cw_iv);   // server RX
     } else {
-        make_info(&tx_info, cw_key, cw_iv);
-        make_info(&rx_info, sw_key, sw_iv);
+        make_info(&tx_info, cw_key, cw_iv);   // client TX
+        make_info(&rx_info, sw_key, sw_iv);   // client RX
     }
 
-    if (setsockopt(fd, SOL_TCP, TCP_ULP, "tls", sizeof("tls")) < 0) { perror("TCP_ULP"); exit(1); }
-    if (setsockopt(fd, SOL_TLS, TLS_TX, &tx_info, sizeof(tx_info)) < 0) { perror("TLS_TX"); exit(1); }
-    if (setsockopt(fd, SOL_TLS, TLS_RX, &rx_info, sizeof(rx_info)) < 0) { perror("TLS_RX"); exit(1); }
+    // Attach ULP and program keys
+    if (setsockopt(fd, SOL_TCP, TCP_ULP, "tls", sizeof("tls")) < 0) {
+        perror("TCP_ULP"); exit(1);
+    }
+    if (setsockopt(fd, SOL_TLS, TLS_TX, &tx_info, sizeof(tx_info)) < 0) {
+        perror("TLS_TX"); exit(1);
+    }
+    if (setsockopt(fd, SOL_TLS, TLS_RX, &rx_info, sizeof(rx_info)) < 0) {
+        perror("TLS_RX"); exit(1);
+    }
 }
 
-// ─── per-size result ──────────────────────────────────────────────────
+// ── Per-size result ────────────────────────────────────────────────────
 
 struct run_result {
     size_t  payload = 0;
@@ -382,18 +318,12 @@ static run_result compute(const sample_buf& buf, size_t payload) {
     return r;
 }
 
-static void print_header(const char* variant_name, const char* variant_desc) {
+static void print_header() {
     printf("\n");
-    printf("═══ KTLS Echo Latency (blocking r/w) ═══════════════════\n");
-    printf("  variant: %s\n", variant_name);
-    printf("  desc:    %s\n", variant_desc);
-    printf("══════════════════════════════════════════════════════\n");
-}
-
-static void print_run(size_t idx, size_t total, size_t payload, int port, uint64_t iters, const run_result& r) {
-    printf("  [%zu/%zu] payload=%zu port=%d n=%llu ... done  (%llu ok, p50=%.1f us)\n",
-           idx, total, payload, port, (unsigned long long)iters,
-           (unsigned long long)r.count, r.p50_us);
+    printf("═══ TLS 1.2 Echo Latency (KTLS) ═════════════════════════\n");
+    printf("  socket: TCP_NODELAY + SO_RCVBUF=262144 + SO_SNDBUF=262144\n");
+    printf("  I/O:    KTLS (BoringSSL key extraction + setsockopt)\n");
+    printf("════════════════════════════════════════════════════════\n");
 }
 
 static void print_table(const std::vector<run_result>& results) {
@@ -419,21 +349,25 @@ struct server_state {
     SSL_CTX*                 ctx{nullptr};
     std::atomic<bool>        stop{false};
 
-    void start(int port) {
-        listen_fd = tcp_listen(port, 3);  // variant 3 = bigbufs
-        ctx = create_server_ctx(3);
-        thread = std::thread([this]() {
-            int client_fd = tcp_accept(listen_fd, 3);
+    void start(int port, int payload_size) {
+        listen_fd = tcp_listen(port);
+        ctx = create_server_ctx();
+        thread = std::thread([this, payload_size]() {
+            int client_fd = tcp_accept(listen_fd);
             SSL* ssl = SSL_new(ctx);
             SSL_set_fd(ssl, client_fd);
             if (SSL_accept(ssl) <= 0) { SSL_free(ssl); close(client_fd); return; }
 
             // Enable KTLS
-            enable_ktls(ssl, client_fd, true, 65536);
+            enable_ktls(ssl, client_fd, true, payload_size);
+
+            // Free SSL object — kernel handles TLS now
             SSL_free(ssl);
 
-            // Raw read/write echo (kernel TLS)
-            std::vector<char> buf(65536);
+            // Echo loop with raw read/write (kernel TLS)
+            // After KTLS, data is raw application data (no length prefix needed)
+            // Kernel handles TLS record framing
+            std::vector<char> buf(payload_size + 64);
             while (!stop.load(std::memory_order_relaxed)) {
                 ssize_t n = read(client_fd, buf.data(), buf.size());
                 if (n <= 0) break;
@@ -460,18 +394,19 @@ struct server_state {
 static run_result run_one_size(const config& cfg, size_t payload_size,
                                int port, uint64_t warmup_n, uint64_t bench_n)
 {
-    int fd = tcp_connect("127.0.0.1", port, 3);
-    auto* ctx = create_client_ctx(3);
-
+    int fd = tcp_connect("127.0.0.1", port);
+    auto* ctx = create_client_ctx();
     SSL* ssl = SSL_new(ctx);
     SSL_set_fd(ssl, fd);
     if (SSL_connect(ssl) <= 0) { SSL_free(ssl); close(fd); return {}; }
 
-    // Enable KTLS on client too
+    // Enable KTLS
     enable_ktls(ssl, fd, false, payload_size);
+
+    // Free SSL object — kernel handles TLS now
     SSL_free(ssl);
 
-    // Raw blocking read/write (kernel TLS)
+    // Raw I/O with kernel TLS (no length prefix, no SSL API)
     std::vector<char> payload(payload_size, 'x');
     std::vector<char> reply(payload_size);
     sample_buf buf;
@@ -483,8 +418,10 @@ static run_result run_one_size(const config& cfg, size_t payload_size,
 
     for (uint64_t i = 0; i < bench_n; ++i) {
         auto t0 = now_ns();
+
         if ((size_t)write(fd, payload.data(), payload_size) != payload_size) { buf.push(0); continue; }
         if ((size_t)read(fd, reply.data(), payload_size) != payload_size) { buf.push(0); continue; }
+
         buf.push(now_ns() - t0);
     }
 
@@ -498,8 +435,7 @@ int main(int argc, char** argv) {
     auto cfg = parse_args(argc, argv);
     OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, nullptr);
 
-    auto& v = VARIANTS[cfg.variant];
-    print_header(v.name, v.desc);
+    print_header();
     printf("  iterations: %llu   warmup: %llu\n",
            (unsigned long long)cfg.iterations,
            (unsigned long long)cfg.warmup);
@@ -519,7 +455,7 @@ int main(int argc, char** argv) {
         else if (payload >= 4096)   { iters /= 4;    warm /= 2;  }
 
         server_state server;
-        server.start(port);
+        server.start(port, payload);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         printf("  [%zu/%zu] payload=%zu port=%d n=%llu ... ",

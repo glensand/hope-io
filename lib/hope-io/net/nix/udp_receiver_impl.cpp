@@ -11,7 +11,6 @@
 #if PLATFORM_LINUX || PLATFORM_APPLE
 
 #include "hope-io/net/nix/udp_receiver_impl.h"
-#include "hope-io/net/factory.h"
 
 #include <cstdlib>
 #include <cstring>

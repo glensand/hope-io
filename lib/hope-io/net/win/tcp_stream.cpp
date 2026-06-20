@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <mswsock.h>
 
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment (lib, "Mswsock.lib")
@@ -25,7 +26,6 @@
 
 #include "hope-io/net/win/tcp_stream.h"
 #include "hope-io/net/init.h"
-#include "hope-io/net/factory.h"
 
  // For internal use, since windows one is not acceptable
 #undef INVALID_SOCKET
@@ -41,9 +41,10 @@ namespace {
 
 namespace hope::io {
 
-    tcp_stream::tcp_stream(unsigned long long in_socket) {
-        m_socket = in_socket;
-    }
+    tcp_stream::tcp_stream(unsigned long long in_socket, const stream_options& opts)
+        : m_socket(in_socket)
+        , m_options(opts)
+    {}
 
     tcp_stream::~tcp_stream() {
         tcp_stream::disconnect();
@@ -64,14 +65,54 @@ namespace hope::io {
         return (int32_t)m_socket;
     }
 
+    void tcp_stream::apply_constructor_options() {
+        // ── TCP_NODELAY (was previously hardcoded in connect, now configurable) ──
+        if (m_options.tcp_nodelay) {
+            int on = 1;
+            setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (const char*)&on, sizeof(on));
+        }
+
+        // ── Keepalive ──────────────────────────────────────────
+        if (m_options.keepalive) {
+            int on = 1;
+            setsockopt(m_socket, SOL_SOCKET, SO_KEEPALIVE, (const char*)&on, sizeof(on));
+        }
+
+        // ── Socket buffer ──────────────────────────────────────
+        if (m_options.send_buffer_size > 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_SNDBUF, (const char*)&m_options.send_buffer_size, sizeof(m_options.send_buffer_size));
+        if (m_options.recv_buffer_size > 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_RCVBUF, (const char*)&m_options.recv_buffer_size, sizeof(m_options.recv_buffer_size));
+
+        // ── Socket behavior ────────────────────────────────────
+        if (m_options.reuse_address) {
+            int on = 1;
+            setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on));
+        }
+        if (m_options.linger_on) {
+            struct linger l;
+            l.l_onoff = m_options.linger_on;
+            l.l_linger = m_options.linger_seconds;
+            setsockopt(m_socket, SOL_SOCKET, SO_LINGER, (const char*)&l, sizeof(l));
+        }
+
+        // ── IP-level ───────────────────────────────────────────
+        if (m_options.ttl >= 0)
+            setsockopt(m_socket, IPPROTO_IP, IP_TTL, (const char*)&m_options.ttl, sizeof(m_options.ttl));
+
+        // ── Timeouts ───────────────────────────────────────────
+        setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO,
+                   (const char*)&m_options.read_timeout, sizeof(m_options.read_timeout));
+        setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO,
+                   (const char*)&m_options.write_timeout, sizeof(m_options.write_timeout));
+    }
+
     void tcp_stream::set_options(const stream_options& options) {
+        m_options = options;
         if (m_socket == INVALID_SOCKET) {
             return;
         }
-        setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO,
-                   (const char*)&options.read_timeout, sizeof(options.read_timeout));
-        setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO,
-                   (const char*)&options.write_timeout, sizeof(options.write_timeout));
+        apply_constructor_options();
     }
 
     void tcp_stream::connect(std::string_view ip, std::size_t port) {
@@ -106,33 +147,38 @@ namespace hope::io {
             m_socket = ::socket(address_info->ai_family, address_info->ai_socktype, address_info->ai_protocol);
             if (m_socket != INVALID_SOCKET)
             {
+                // Apply pre-connect options
+                apply_constructor_options();
+
                 u_long mode = 1;
                 if (ioctlsocket(m_socket, FIONBIO, &mode) != 0) {
                     closesocket(m_socket);
                     m_socket = INVALID_SOCKET;
                 } else {
-                    int on = 1;
-                    int error = setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, (char*)&on, sizeof(on));
-                    if (error == NO_ERROR) {
-                        error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
-                        if (WSAGetLastError() == WSAEWOULDBLOCK) {
-                            error = NO_ERROR;
-                            mode = 0;
-                            error |= ioctlsocket(m_socket, FIONBIO, &mode);
-                            fd_set write, err;
-                            FD_ZERO(&write);
-                            FD_ZERO(&err);
-                            FD_SET(m_socket, &write);
-                            FD_SET(m_socket, &err);
+                    int error = ::connect(m_socket, address_info->ai_addr, (int)address_info->ai_addrlen);
+                    if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                        error = NO_ERROR;
+                        mode = 0;
+                        error |= ioctlsocket(m_socket, FIONBIO, &mode);
+                        fd_set write, err;
+                        FD_ZERO(&write);
+                        FD_ZERO(&err);
+                        FD_SET(m_socket, &write);
+                        FD_SET(m_socket, &err);
 
-                            TIMEVAL timeout;
-                            timeout.tv_sec = 3;
-                            timeout.tv_usec = 0;
-                            select(0, NULL, &write, &err, &timeout);			
-                            if(!FD_ISSET(m_socket, &write)) {
-                                error = SOCKET_ERROR;
-                            }
+                        TIMEVAL timeout;
+                        timeout.tv_sec = 3;
+                        timeout.tv_usec = 0;
+                        select(0, NULL, &write, &err, &timeout);			
+                        if(!FD_ISSET(m_socket, &write)) {
+                            error = SOCKET_ERROR;
                         }
+                    }
+
+                    // Apply non_block_mode post-connect
+                    if (!m_options.non_block_mode) {
+                        mode = 0;
+                        ioctlsocket(m_socket, FIONBIO, &mode);
                     }
 
                     if (error == SOCKET_ERROR) {
@@ -213,5 +259,4 @@ namespace hope::io {
 
 
 }
-
 #endif

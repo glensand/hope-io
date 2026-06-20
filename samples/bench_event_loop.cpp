@@ -17,7 +17,14 @@
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#include "hope-io/net/tls/tcp_tls_stream.h"
+#if PLATFORM_LINUX
+#include "hope-io/net/linux/event_loop_impl.h"
+#endif
+#if PLATFORM_APPLE
+#include "hope-io/net/nix/event_loop_impl.h"
+#endif
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/coredefs.h"
@@ -52,6 +59,7 @@ struct bench_config {
     int         port        = 19300;
     std::string cert_path;
     std::string key_path;
+    bool        ktls        = false;
 };
 
 // ── Per-thread latency buffer ─────────────────────────────────────────
@@ -98,6 +106,7 @@ static void parse_args(int argc, char** argv, bench_config& cfg) {
         else if (arg == "--port")        cfg.port        = std::stoi(next());
         else if (arg == "--cert")        cfg.cert_path   = next();
         else if (arg == "--key")         cfg.key_path    = next();
+        else if (arg == "--ktls")        cfg.ktls        = true;
         else { fprintf(stderr, "bench: unknown %s\n", arg.c_str()); exit(1); }
     }
 }
@@ -170,6 +179,7 @@ static void run_server(const bench_config& cfg, server_guard& sg) {
         scfg.max_mutual_connections = 10000;
         scfg.max_accepts_per_tick   = 1000;
         scfg.epoll_timeout = 1000;
+        scfg.enable_ktls  = cfg.ktls;
         sg.start(true, loop, std::move(scfg), std::move(cb));
     } else {
         auto* loop = new hope::io::event_loop_impl();

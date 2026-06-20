@@ -10,8 +10,6 @@
 
 #include "hope-io/net/tls/tls_stream.h"
 
-#ifdef HOPE_IO_USE_OPENSSL
-
 namespace hope::io {
 
     class tcp_tls_stream final : public base_tls_stream {
@@ -23,5 +21,3 @@ namespace hope::io {
     };
 
 }
-
-#endif

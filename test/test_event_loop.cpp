@@ -8,7 +8,9 @@
 
 #include <gtest/gtest.h>
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#include "hope-io/net/nix/event_loop_impl.h"
+#include "hope-io/net/linux/event_loop_impl.h"
 #include "hope-io/net/init.h"
 #include <thread>
 #include <chrono>

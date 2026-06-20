@@ -11,7 +11,7 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 
-#if PLATFORM_APPLE && defined(HOPE_IO_USE_OPENSSL)
+#if PLATFORM_APPLE
 
 #include <deque>
 #include <unordered_set>

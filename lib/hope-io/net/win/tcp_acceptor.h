@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hope-io/net/acceptor.h"
+#include "hope-io/net/stream.h"
 
 #if PLATFORM_WINDOWS
 
@@ -16,7 +17,7 @@ namespace hope::io {
 
     class tcp_acceptor final : public acceptor {
     public:
-        tcp_acceptor() = default;
+        explicit tcp_acceptor(const stream_options& opts = stream_options{});
         virtual ~tcp_acceptor() override;
 
         void open(std::size_t port) override;
@@ -26,6 +27,7 @@ namespace hope::io {
 
     private:
         unsigned long long m_listen_socket{ 0 };
+        stream_options m_options;
     };
 
 }

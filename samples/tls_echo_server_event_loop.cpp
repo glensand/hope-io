@@ -10,7 +10,8 @@
 #include "message.h"
 
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/tls/tls_acceptor_impl.h"
+#include "hope-io/net/linux/event_loop_impl.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 
@@ -49,26 +50,26 @@ int main(int argc, char *argv[]) {
         hope::io::event_loop::callbacks callbacks;
 
         callbacks.on_connect = [](hope::io::event_loop::connection& conn) {
-            std::cout << "New TLS connection from: " << conn.get_endpoint() << std::endl;
+            std::cout << "New TLS connection fd: " << conn.descriptor << std::endl;
             conn.set_state(hope::io::event_loop::connection_state::read);
         };
 
         callbacks.on_read = [](hope::io::event_loop::connection& conn) {
-            std::cout << "Data received from: " << conn.get_endpoint() << std::endl;
+            std::cout << "Data received from fd: " << conn.descriptor << std::endl;
             
             // Echo back the data: change to write state
             conn.set_state(hope::io::event_loop::connection_state::write);
         };
 
         callbacks.on_write = [](hope::io::event_loop::connection& conn) {
-            std::cout << "Data sent to: " << conn.get_endpoint() << std::endl;
+            std::cout << "Data sent to fd: " << conn.descriptor << std::endl;
             
             // Go back to read state for more data
             conn.set_state(hope::io::event_loop::connection_state::read);
         };
 
         callbacks.on_err = [](hope::io::event_loop::connection& conn, const std::string& error) {
-            std::cout << "Error on connection " << conn.get_endpoint() << ": " << error << std::endl;
+            std::cout << "Error on connection fd " << conn.descriptor << ": " << error << std::endl;
             conn.set_state(hope::io::event_loop::connection_state::die);
         };
 

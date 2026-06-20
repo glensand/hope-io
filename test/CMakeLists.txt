@@ -43,7 +43,7 @@ target_link_libraries(hope-io-test
     GTest::gmock
 )
 
-target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
+
 message("test/ Using BoringSSL, TLS tests are available")
 
 # Platform definitions for the TLS event loop test (must match lib/CMakeLists.txt)

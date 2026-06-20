@@ -12,8 +12,8 @@
 
 #include "hope-io/net/linux/tls_event_loop_impl.h"
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/factory.h"
 #include "hope-io/net/tls/tls_init.h"
+#include "hope-io/net/tls/ktls_enable.h"
 
 #include "openssl/ssl.h"
 #include "openssl/err.h"
@@ -29,15 +29,88 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <sys/types.h>
 #include <netdb.h>
 #include <string.h>
 #include <sys/epoll.h>
 #include <errno.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 namespace hope::io {
+
+namespace {
+
+void apply_stream_options(int fd, const stream_options& opt) {
+    if (opt.tcp_nodelay) {
+        int on = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    }
+
+#ifdef TCP_USER_TIMEOUT
+    if (opt.tcp_user_timeout >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &opt.tcp_user_timeout, sizeof(opt.tcp_user_timeout));
+    }
+#endif
+
+    if (opt.keepalive) {
+        int on = 1;
+        setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+    }
+
+#ifdef TCP_KEEPIDLE
+    if (opt.keepidle >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &opt.keepidle, sizeof(opt.keepidle));
+    }
+#endif
+
+#ifdef TCP_KEEPINTVL
+    if (opt.keepintvl >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &opt.keepintvl, sizeof(opt.keepintvl));
+    }
+#endif
+
+#ifdef TCP_KEEPCNT
+    if (opt.keepcnt >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &opt.keepcnt, sizeof(opt.keepcnt));
+    }
+#endif
+
+    if (opt.send_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &opt.send_buffer_size, sizeof(opt.send_buffer_size));
+    }
+
+    if (opt.recv_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &opt.recv_buffer_size, sizeof(opt.recv_buffer_size));
+    }
+
+    if (opt.linger_on) {
+        struct linger l;
+        l.l_onoff = opt.linger_on;
+        l.l_linger = opt.linger_seconds;
+        setsockopt(fd, SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+    }
+
+#ifdef IP_TTL
+    if (opt.ttl >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TTL, &opt.ttl, sizeof(opt.ttl));
+    }
+#endif
+
+#ifdef IP_TOS
+    if (opt.tos >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &opt.tos, sizeof(opt.tos));
+    }
+#endif
+
+#ifdef SO_MARK
+    if (opt.mark >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_MARK, &opt.mark, sizeof(opt.mark));
+    }
+#endif
+}
+
+} // anonymous namespace
 
     tls_event_loop_impl::tls_event_loop_impl() {
         event_loop::connection::on_state_changed = [this](const event_loop::connection& conn) {
@@ -232,6 +305,8 @@ namespace hope::io {
                 continue;
             }
 
+            apply_stream_options(sock, m_cfg.accepted_stream_options);
+
             SSL* ssl = SSL_new(m_ctx);
             if (!ssl) {
                 event_loop::connection dumb;
@@ -253,6 +328,9 @@ namespace hope::io {
             int ret = SSL_do_handshake(ssl);
             if (ret == 1) {
                 register_connection(sock, ssl, cb);
+                if (m_cfg.enable_ktls) {
+                    m_tls_states[sock].ktls_active = try_enable_fd_ktls(ssl, sock, true);
+                }
                 cb.on_connect(m_connections[sock]);
                 // Drain any application data that arrived during the handshake
                 // (edge-triggered epoll won't fire EPOLLIN again for it).
@@ -280,6 +358,9 @@ namespace hope::io {
         if (ret == 1) {
             m_pending_handshakes.erase(sock);
             register_connection(sock, tls.ssl, cb);
+            if (m_cfg.enable_ktls) {
+                tls.ktls_active = try_enable_fd_ktls(tls.ssl, sock, true);
+            }
             cb.on_connect(m_connections[sock]);
             // Drain any application data that arrived during the deferred handshake
             handle_read(m_connections[sock], cb);
@@ -328,29 +409,48 @@ namespace hope::io {
         bool error = false;
         bool got_data = false;
 
-        // Drain ALL available TLS records — SSL_read returns one TLS record at a time,
-        // and edge-triggered epoll may not fire again for data already in the SSL buffer.
-        while (true) {
-            auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
-                ERR_clear_error();
-                int received = SSL_read(tls.ssl, data, (int)size);
-                if (received > 0) {
-                    got_data = true;
-                    return (std::size_t)received;
-                }
-
-                int err = SSL_get_error(tls.ssl, received);
-                if (err == SSL_ERROR_WANT_READ) {
+        if (tls.ktls_active) {
+            // KTLS path: raw recv() — kernel handles decryption.
+            // Branch predicted well since all connections share the same mode.
+            while (true) {
+                auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                    auto received = ::recv(conn.descriptor, (char*)data, size, 0);
+                    if (received > 0) {
+                        got_data = true;
+                        return (std::size_t)received;
+                    }
+                    if (received == 0 || (errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+                        return 0;
+                    }
+                    error = true;
                     return 0;
-                }
-                if (err == SSL_ERROR_ZERO_RETURN) {
-                    return 0;
-                }
-                error = true;
-                return 0;
-            });
+                });
+                if (consumed == 0) break;
+            }
+        } else {
+            // Standard SSL path: use SSL_read
+            while (true) {
+                auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                    ERR_clear_error();
+                    int received = SSL_read(tls.ssl, data, (int)size);
+                    if (received > 0) {
+                        got_data = true;
+                        return (std::size_t)received;
+                    }
 
-            if (consumed == 0) break;
+                    int err = SSL_get_error(tls.ssl, received);
+                    if (err == SSL_ERROR_WANT_READ) {
+                        return 0;
+                    }
+                    if (err == SSL_ERROR_ZERO_RETURN) {
+                        return 0;
+                    }
+                    error = true;
+                    return 0;
+                });
+
+                if (consumed == 0) break;
+            }
         }
 
         if (got_data && !error) {
@@ -366,19 +466,36 @@ namespace hope::io {
         if (conn.get_state() != event_loop::connection_state::write) return;
 
         auto& tls = m_tls_states[conn.descriptor];
-        conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
-            ERR_clear_error();
-            int sent = SSL_write(tls.ssl, data, (int)size);
-            if (sent > 0) return (std::size_t)sent;
 
-            int err = SSL_get_error(tls.ssl, sent);
-            if (err == SSL_ERROR_WANT_WRITE) {
-                return 0;
-            }
-            cb.on_err(conn, "SSL_write failed");
-            conn.set_state(event_loop::connection_state::die);
-            return size;
-        });
+        if (tls.ktls_active) {
+            // KTLS path: raw send() — kernel handles encryption.
+            // Branch predicted well since all connections share the same mode.
+            conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                auto sent = ::send(conn.descriptor, (const char*)data, size, 0);
+                if (sent > 0) return (std::size_t)sent;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    return 0;
+                }
+                cb.on_err(conn, "KTLS write failed");
+                conn.set_state(event_loop::connection_state::die);
+                return size;
+            });
+        } else {
+            // Standard SSL path: use SSL_write
+            conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                ERR_clear_error();
+                int sent = SSL_write(tls.ssl, data, (int)size);
+                if (sent > 0) return (std::size_t)sent;
+
+                int err = SSL_get_error(tls.ssl, sent);
+                if (err == SSL_ERROR_WANT_WRITE) {
+                    return 0;
+                }
+                cb.on_err(conn, "SSL_write failed");
+                conn.set_state(event_loop::connection_state::die);
+                return size;
+            });
+        }
 
         if (conn.buffer->is_empty()) {
             cb.on_write(conn);

@@ -35,6 +35,7 @@ cmake-build-release/
 Build/
 build/
 build_debug/
+build_old/
 build_test/
 *.DS_Store
 .vs/

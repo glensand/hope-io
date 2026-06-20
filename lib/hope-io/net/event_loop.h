@@ -16,6 +16,8 @@
 #include <cstring>
 #include <type_traits>
 
+#include "hope-io/net/stream.h"
+
 namespace hope::io {
 
     class event_loop {
@@ -227,6 +229,7 @@ namespace hope::io {
             std::size_t port = 9393;
             int epoll_temeout = 1000;
             class acceptor* custom_acceptor = nullptr;  // If provided, this acceptor will be used instead of creating a default one
+            stream_options accepted_stream_options;     // Socket options applied to each accepted connection
         };
 
         virtual ~event_loop() = default;

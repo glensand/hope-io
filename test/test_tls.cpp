@@ -9,7 +9,9 @@
 #include <gtest/gtest.h>
 #include "hope-io/net/stream.h"
 #include "hope-io/net/acceptor.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#include "hope-io/net/tls/tcp_tls_stream.h"
+#include "hope-io/net/tls/ktls_enable.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_acceptor_impl.h"
 #include <thread>
@@ -22,8 +24,6 @@ namespace fs = std::filesystem;
 
 using namespace std::chrono_literals;
 
-// Skip TLS tests if OpenSSL is not available
-#ifdef HOPE_IO_USE_OPENSSL
 
 class TlsTest : public ::testing::Test {
 protected:
@@ -102,23 +102,30 @@ TEST_F(TlsTest, CreateTlsStream) {
 //     auto* tcp_stream = new hope::io::tcp_stream();
 //     auto* ws_stream = hope::io::create_tls_websockets_stream(tcp_stream);
 //
-//     // Websockets stream creation might fail if not properly configured
-//     // Just check it doesn't crash
-//     if (ws_stream) {
-//         delete ws_stream;
-//     } else {
-//         delete tcp_stream;
-//     }
-// }
+// ── KTLS Tests ────────────────────────────────────────────────────────
 
-#else
-
-// If OpenSSL is not available, skip all TLS tests
-class TlsTest : public ::testing::Test {};
-
-TEST_F(TlsTest, TlsNotAvailable) {
-    GTEST_SKIP() << "OpenSSL not available, TLS tests skipped";
+TEST_F(TlsTest, KtlsUnsupportedPlatform) {
+    // On platforms without KTLS support, try_enable_fd_ktls should
+    // gracefully return false without crashing.
+    EXPECT_FALSE(hope::io::try_enable_fd_ktls(nullptr, -1, false));
+    EXPECT_FALSE(hope::io::try_enable_fd_ktls(nullptr, 0, true));
 }
 
-#endif // HOPE_IO_USE_OPENSSL
+TEST_F(TlsTest, KtlsFlagDoesNotBreakStream) {
+    // Setting KTLS flag on a stream should not break normal TLS operation
+    // when KTLS is not available — it should silently fall back.
+    auto* tcp = new hope::io::tcp_stream();
+    auto* tls = new hope::io::tcp_tls_stream(tcp);
+    ASSERT_NE(tls, nullptr);
+    tls->set_ktls_enabled(true);
+    // The stream should still work (KTLS attempt will fail, fallback to SSL)
+    delete tls;
+}
+
+// ── KTLS Event Loop Integration ───────────────────────────────────────
+
+// Test that setting enable_ktls in tls_config doesn't break the event loop.
+// The KTLS flag is tested in the event loop test file since it requires
+// the full event loop infrastructure.
+
 

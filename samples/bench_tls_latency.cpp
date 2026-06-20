@@ -21,7 +21,8 @@
 #include "hope-io/net/init.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/acceptor.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#include "hope-io/net/tls/tcp_tls_stream.h"
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_acceptor_impl.h"
 

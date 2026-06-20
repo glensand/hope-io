@@ -31,7 +31,7 @@ add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})
 # ── BoringSSL (git submodule at lib/boringssl) ─────────────────────────
 add_subdirectory(boringssl)
 
-target_compile_definitions(hope-io PUBLIC -DHOPE_IO_USE_OPENSSL)
+
 target_link_libraries(hope-io ssl crypto)
 
 message("Hope-io/ Using BoringSSL (submodule)")

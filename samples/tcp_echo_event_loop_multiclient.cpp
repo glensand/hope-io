@@ -13,7 +13,7 @@
 #include "message.h"
 
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
 #include "hope-io/net/init.h"
 
 #include<sys/types.h>

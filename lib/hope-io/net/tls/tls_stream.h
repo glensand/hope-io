@@ -12,8 +12,6 @@
 #include "hope-io/net/tls/tls_init.h"
 #include "hope-io/coredefs.h"
 
-#ifdef HOPE_IO_USE_OPENSSL
-
 namespace hope::io { class tcp_stream; }
 
 #include "openssl/ssl.h"
@@ -25,7 +23,8 @@ namespace hope::io {
 
     class base_tls_stream : public stream {
     public:
-        explicit base_tls_stream(tcp_stream* tcp_str = nullptr);
+        explicit base_tls_stream(tcp_stream* tcp_str = nullptr,
+                                 const stream_options& opts = stream_options{});
         virtual ~base_tls_stream();
 
         std::string get_endpoint() const override;
@@ -41,6 +40,10 @@ namespace hope::io {
 
         size_t read_bytes(void* data, std::size_t length) const;
 
+        void set_ktls_enabled(bool enabled) { m_ktls_enabled = enabled; }
+        bool is_ktls_enabled() const { return m_ktls_enabled; }
+        void try_enable_ktls();
+
     protected:
         bool wait_for_ssl(int ssl_error, int timeout_ms);
         void handle_ssl_error(const char* op, int result);
@@ -48,8 +51,8 @@ namespace hope::io {
         tcp_stream* m_tcp_stream{ nullptr };
         ssl_st* m_ssl{ nullptr };
         ssl_ctx_st* m_context{ nullptr };
+        stream_options m_options{};
+        bool m_ktls_enabled = false;
     };
 
 }
-
-#endif

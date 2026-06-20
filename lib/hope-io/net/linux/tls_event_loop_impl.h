@@ -11,11 +11,10 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 
-#if PLATFORM_LINUX && defined(HOPE_IO_USE_OPENSSL)
+#if PLATFORM_LINUX
 
 #include <deque>
 #include <unordered_set>
-#include <unordered_map>
 #include <atomic>
 #include <sys/epoll.h>
 
@@ -34,6 +33,7 @@ namespace hope::io {
     private:
         struct tls_per_conn {
             SSL* ssl = nullptr;
+            bool ktls_active = false;
         };
 
         struct buffer_pool final {

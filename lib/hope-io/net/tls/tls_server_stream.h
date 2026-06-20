@@ -10,18 +10,14 @@
 
 #include "hope-io/net/tls/tls_stream.h"
 
-#ifdef HOPE_IO_USE_OPENSSL
-
 namespace hope::io {
 
     class tls_server_stream final : public base_tls_stream {
     public:
-        tls_server_stream(tcp_stream* tcp_stream, SSL_CTX* context);
+        tls_server_stream(tcp_stream* tcp_stream, SSL_CTX* context, const stream_options& opts = stream_options{});
         void connect(std::string_view ip, std::size_t port) override;
         void disconnect() override;
         void accept_tls();
     };
 
 }
-
-#endif

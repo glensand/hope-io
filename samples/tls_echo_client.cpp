@@ -9,7 +9,7 @@
 #include "message.h"
 
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/tls/tcp_tls_stream.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 

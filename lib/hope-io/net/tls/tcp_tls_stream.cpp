@@ -8,22 +8,25 @@
 
 #include "tls_stream.h"
 #include "hope-io/net/tls/tcp_tls_stream.h"
-#include "hope-io/net/factory.h"
-
-#ifdef HOPE_IO_USE_OPENSSL
+#include "hope-io/net/tls/ktls_enable.h"
 
 #if PLATFORM_LINUX || PLATFORM_APPLE
+#include "hope-io/net/nix/tcp_stream.h"
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 #elif PLATFORM_WINDOWS
+#include "hope-io/net/win/tcp_stream.h"
 #include <winsock2.h>
 #endif
 
 namespace hope::io {
 
-    base_tls_stream::base_tls_stream(tcp_stream* tcp_str)
-        : m_tcp_stream(tcp_str) {
+    base_tls_stream::base_tls_stream(tcp_stream* tcp_str, const stream_options& opts)
+        : m_tcp_stream(tcp_str)
+        , m_options(opts) {
         if (m_tcp_stream == nullptr) {
-            m_tcp_stream = new tcp_stream();
+            m_tcp_stream = new tcp_stream(static_cast<unsigned long long>(-1), m_options);
         }
     }
 
@@ -50,10 +53,22 @@ namespace hope::io {
     }
 
     void base_tls_stream::write(const void *data, std::size_t length) {
-        if (length == 0) return;
+        HOPE_ASSERT(length > 0, "base_tls_stream::write: zero length");
+#if PLATFORM_LINUX
+        if (m_ktls_enabled) {
+            std::size_t total = 0;
+            while (total < length) {
+                auto sent = ::send(m_tcp_stream->platform_socket(),
+                                   (const char*)data + total, length - total, 0);
+                if (sent <= 0) HOPE_THROW("tls_stream", "KTLS write failed");
+                total += sent;
+            }
+            return;
+        }
+#endif
         std::size_t total = 0;
         while (total < length) {
-            const auto sent = SSL_write(m_ssl, static_cast<const char*>(data) + total, length - total);
+            const auto sent = SSL_write(m_ssl, static_cast<const char*>(data) + total, (int)(length - total));
             if (sent > 0) {
                 total += sent;
             } else {
@@ -66,13 +81,35 @@ namespace hope::io {
         std::size_t total_size = 0;
         for (auto& buf : buffers) total_size += buf.size();
         if (total_size == 0) return;
+#if PLATFORM_LINUX
+        if (m_ktls_enabled) {
+            // KTLS: use writev directly — scatter-gather syscall, no gather buffer needed.
+            std::array<iovec, 1024> iovs;
+            auto count = buffers.size();
+            for (auto i = 0u; i < count; ++i) {
+                iovs[i] = iovec{const_cast<char*>(buffers[i].data()), buffers[i].size()};
+            }
+            auto op_res = writev(m_tcp_stream->platform_socket(), iovs.data(), (int)count);
+            if (op_res == -1) HOPE_THROW_ERRNO("tls_stream", "KTLS writev failed");
+            auto written = (std::size_t)op_res;
+            if (written < total_size) {
+                std::size_t skip = written;
+                for (auto i = 0u; i < count; ++i) {
+                    if (skip >= buffers[i].size()) { skip -= buffers[i].size(); continue; }
+                    write(buffers[i].data() + skip, buffers[i].size() - skip);
+                    skip = 0;
+                }
+            }
+            return;
+        }
+#endif
         std::string gathered;
         gathered.reserve(total_size);
         for (auto& buf : buffers)
             gathered.append(buf.data(), buf.size());
         std::size_t written = 0;
         while (written < total_size) {
-            const auto sent = SSL_write(m_ssl, gathered.data() + written, total_size - written);
+            const auto sent = SSL_write(m_ssl, gathered.data() + written, (int)(total_size - written));
             if (sent > 0) {
                 written += sent;
             } else {
@@ -82,6 +119,23 @@ namespace hope::io {
     }
 
     size_t base_tls_stream::read(void *data, std::size_t length) {
+#if PLATFORM_LINUX
+        if (m_ktls_enabled) {
+            std::size_t total = 0;
+            while (total < length) {
+                auto received = ::recv(m_tcp_stream->platform_socket(),
+                                       (char*)data + total, length - total, 0);
+                if (received > 0) {
+                    total += received;
+                } else if (received == 0) {
+                    HOPE_THROW("tls_stream", "KTLS read: connection closed by peer");
+                } else {
+                    HOPE_THROW("tls_stream", "KTLS read failed");
+                }
+            }
+            return total;
+        }
+#endif
         std::size_t total = 0;
         while (total < length) {
             const auto received = SSL_read(m_ssl, (char*)data + total, (int)(length - total));
@@ -97,6 +151,13 @@ namespace hope::io {
     }
 
     size_t base_tls_stream::read_once(void* data, std::size_t length) {
+#if PLATFORM_LINUX
+        if (m_ktls_enabled) {
+            auto received = ::recv(m_tcp_stream->platform_socket(), (char*)data, length, 0);
+            if (received < 0) return 0;
+            return (std::size_t)received;
+        }
+#endif
         const auto received = SSL_read(m_ssl, (char*)data, (int)length);
         if (received > 0) return received;
         if (received == 0) return 0;
@@ -107,6 +168,23 @@ namespace hope::io {
     }
 
     void base_tls_stream::stream_in(std::string& out_stream) {
+#if PLATFORM_LINUX
+        if (m_ktls_enabled) {
+            constexpr static std::size_t BufferSize{ 1024 };
+            char buffer[BufferSize];
+            while (true) {
+                auto bytes_read = ::recv(m_tcp_stream->platform_socket(), buffer, BufferSize, 0);
+                if (bytes_read > 0) {
+                    out_stream.append(buffer, bytes_read);
+                } else if (bytes_read == 0) {
+                    break;
+                } else {
+                    HOPE_THROW("tls_stream", "KTLS read (stream_in) failed");
+                }
+            }
+            return;
+        }
+#endif
         constexpr static std::size_t BufferSize{ 1024 };
         char buffer[BufferSize];
         while (true) {
@@ -132,7 +210,19 @@ namespace hope::io {
 
     void base_tls_stream::set_options(const stream_options& opt) {
         assert(m_tcp_stream);
+        m_options = opt;
         m_tcp_stream->set_options(opt);
+    }
+
+    void base_tls_stream::try_enable_ktls() {
+#if PLATFORM_LINUX
+        if (!m_ktls_enabled || !m_ssl) return;
+        int fd = m_tcp_stream->platform_socket();
+        if (fd < 0) return;
+        m_ktls_enabled = try_enable_fd_ktls(m_ssl, fd, false);
+#else
+        m_ktls_enabled = false;
+#endif
     }
 
     bool base_tls_stream::wait_for_ssl(int ssl_error, int timeout_ms) {
@@ -216,6 +306,11 @@ namespace hope::io {
         if (SSL_connect(m_ssl) <= 0) {
             throw std::runtime_error("hope-io/tcp_tls_stream: cannot establish connection");
         }
+
+        // Attempt KTLS after successful handshake
+        if (m_ktls_enabled) {
+            try_enable_ktls();
+        }
     }
 
     void tcp_tls_stream::disconnect() {
@@ -223,12 +318,4 @@ namespace hope::io {
         m_context = nullptr;
     }
 
-
-
 }
-
-#else
-
-
-
-#endif

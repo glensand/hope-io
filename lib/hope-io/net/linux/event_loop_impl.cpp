@@ -10,7 +10,6 @@
 #include "hope-io/net/linux/event_loop_impl.h"
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
 #include "hope-io/coredefs.h"
 
 #include <deque>
@@ -23,6 +22,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <sys/types.h>
 #include <netdb.h>
 #include <string.h>
@@ -31,7 +31,80 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace hope::io { 
+namespace hope::io {
+
+namespace {
+
+void apply_stream_options(int fd, const stream_options& opt) {
+    if (opt.tcp_nodelay) {
+        int on = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    }
+
+#ifdef TCP_USER_TIMEOUT
+    if (opt.tcp_user_timeout >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &opt.tcp_user_timeout, sizeof(opt.tcp_user_timeout));
+    }
+#endif
+
+    if (opt.keepalive) {
+        int on = 1;
+        setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+    }
+
+#ifdef TCP_KEEPIDLE
+    if (opt.keepidle >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &opt.keepidle, sizeof(opt.keepidle));
+    }
+#endif
+
+#ifdef TCP_KEEPINTVL
+    if (opt.keepintvl >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &opt.keepintvl, sizeof(opt.keepintvl));
+    }
+#endif
+
+#ifdef TCP_KEEPCNT
+    if (opt.keepcnt >= 0) {
+        setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &opt.keepcnt, sizeof(opt.keepcnt));
+    }
+#endif
+
+    if (opt.send_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &opt.send_buffer_size, sizeof(opt.send_buffer_size));
+    }
+
+    if (opt.recv_buffer_size >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &opt.recv_buffer_size, sizeof(opt.recv_buffer_size));
+    }
+
+    if (opt.linger_on) {
+        struct linger l;
+        l.l_onoff = opt.linger_on;
+        l.l_linger = opt.linger_seconds;
+        setsockopt(fd, SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+    }
+
+#ifdef IP_TTL
+    if (opt.ttl >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TTL, &opt.ttl, sizeof(opt.ttl));
+    }
+#endif
+
+#ifdef IP_TOS
+    if (opt.tos >= 0) {
+        setsockopt(fd, IPPROTO_IP, IP_TOS, &opt.tos, sizeof(opt.tos));
+    }
+#endif
+
+#ifdef SO_MARK
+    if (opt.mark >= 0) {
+        setsockopt(fd, SOL_SOCKET, SO_MARK, &opt.mark, sizeof(opt.mark));
+    }
+#endif
+}
+
+} // anonymous namespace
 
     std::function<void(const event_loop::connection& conn)> event_loop::connection::on_state_changed;
 
@@ -154,6 +227,7 @@ namespace hope::io {
                 }
             }
             if (sock != -1) {
+                apply_stream_options(sock, m_cfg.accepted_stream_options);
                 push_new_connection(sock);
                 epoll_ctl_add(m_epfd, sock, EPOLLRDHUP | EPOLLHUP | EPOLLET, cb);
                 cb.on_connect(m_connections[sock]);

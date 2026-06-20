@@ -8,22 +8,16 @@
 
 #include "tls_init.h"
 
-#ifdef HOPE_IO_USE_OPENSSL
 #include "openssl/ssl.h"
-#endif
 
 #include <cassert>
 
 namespace hope::io {
 
     void init_tls() {
-#ifdef HOPE_IO_USE_OPENSSL
         // OPENSSL_init_ssl() is idempotent and thread-safe on OpenSSL >= 1.1.0.
         // It replaces the deprecated SSL_library_init() / SSL_load_error_strings() / OpenSSL_add_all_algorithms().
         OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, nullptr);
-#else
-        assert(false && "hope-io/ OpenSSL is not available");
-#endif
     }
 
     void deinit_tls() {

@@ -4,7 +4,6 @@
 #include "hope-io/coredefs.h"
 #if PLATFORM_LINUX || PLATFORM_APPLE
 #include "hope-io/net/nix/tcp_stream.h"
-#include "hope-io/net/factory.h"
 #include <array>
 #include <cassert>
 #include <stdexcept>
@@ -12,6 +11,7 @@
 #include <cstring>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <fcntl.h>
@@ -21,7 +21,9 @@
 #include <sys/time.h>
 
 namespace hope::io {
-    tcp_stream::tcp_stream(unsigned long long in_socket) {
+    tcp_stream::tcp_stream(unsigned long long in_socket, const stream_options& opts)
+        : m_options(opts)
+    {
         HOPE_ASSERT(in_socket != 0, "tcp_stream: fd 0 is stdin, not a network socket");
         if (in_socket == static_cast<unsigned long long>(-1)) {
             m_socket = -1;
@@ -53,7 +55,19 @@ namespace hope::io {
         serv_addr.sin_addr = ipv4->sin_addr;
         freeaddrinfo(res);
         if ((m_socket = socket(AF_INET, SOCK_STREAM, 0)) == -1) HOPE_THROW_ERRNO("tcp_stream", "cannot create socket");
+
+        // Apply pre-connect socket options (TCP_NODELAY, buffer sizes, keepalive, etc.)
+        apply_constructor_options();
+
         if (::connect(m_socket, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) HOPE_THROW_ERRNO("tcp_stream", "cannot connect to host");
+
+        // non_block_mode applied post-connect (blocking connect needs to complete first)
+        if (m_options.non_block_mode) {
+            auto flags = fcntl(m_socket, F_GETFL, 0);
+            if (flags != -1) {
+                fcntl(m_socket, F_SETFL, flags | O_NONBLOCK);
+            }
+        }
     }
     void tcp_stream::disconnect() {
         if (m_socket >= 0) { close(m_socket); }
@@ -104,19 +118,106 @@ namespace hope::io {
         return (std::size_t)received;
     }
     void tcp_stream::stream_in(std::string& buffer) { assert(false && "Not implemented"); }
+
+    void tcp_stream::apply_constructor_options() {
+        // ── IPPROTO_TCP ────────────────────────────────────────
+        if (m_options.tcp_nodelay) {
+            int on = 1;
+            setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+        }
+#ifdef TCP_USER_TIMEOUT
+        if (m_options.tcp_user_timeout >= 0) {
+            setsockopt(m_socket, IPPROTO_TCP, TCP_USER_TIMEOUT,
+                       &m_options.tcp_user_timeout, sizeof(m_options.tcp_user_timeout));
+        }
+#endif
+
+        // ── Keepalive ──────────────────────────────────────────
+        if (m_options.keepalive) {
+            int on = 1;
+            setsockopt(m_socket, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on));
+        }
+#ifdef TCP_KEEPIDLE
+        if (m_options.keepidle >= 0)
+            setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPIDLE, &m_options.keepidle, sizeof(m_options.keepidle));
+#endif
+#ifdef TCP_KEEPINTVL
+        if (m_options.keepintvl >= 0)
+            setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPINTVL, &m_options.keepintvl, sizeof(m_options.keepintvl));
+#endif
+#ifdef TCP_KEEPCNT
+        if (m_options.keepcnt >= 0)
+            setsockopt(m_socket, IPPROTO_TCP, TCP_KEEPCNT, &m_options.keepcnt, sizeof(m_options.keepcnt));
+#endif
+
+        // ── Socket buffer ──────────────────────────────────────
+        if (m_options.send_buffer_size > 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_SNDBUF, &m_options.send_buffer_size, sizeof(m_options.send_buffer_size));
+        if (m_options.recv_buffer_size > 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_RCVBUF, &m_options.recv_buffer_size, sizeof(m_options.recv_buffer_size));
+
+        // ── Socket behavior ────────────────────────────────────
+        if (m_options.reuse_address) {
+            int on = 1;
+            setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        }
+#ifdef SO_REUSEPORT
+        if (m_options.reuse_port) {
+            int on = 1;
+            setsockopt(m_socket, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
+        }
+#endif
+        if (m_options.linger_on) {
+            struct linger l;
+            l.l_onoff = m_options.linger_on;
+            l.l_linger = m_options.linger_seconds;
+            setsockopt(m_socket, SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+        }
+#ifdef SO_PRIORITY
+        if (m_options.priority >= 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_PRIORITY, &m_options.priority, sizeof(m_options.priority));
+#endif
+
+        // ── IP-level ───────────────────────────────────────────
+        if (m_options.ttl >= 0)
+            setsockopt(m_socket, IPPROTO_IP, IP_TTL, &m_options.ttl, sizeof(m_options.ttl));
+#ifdef IP_TOS
+        if (m_options.tos >= 0)
+            setsockopt(m_socket, IPPROTO_IP, IP_TOS, &m_options.tos, sizeof(m_options.tos));
+#endif
+#ifdef SO_MARK
+        if (m_options.mark >= 0)
+            setsockopt(m_socket, SOL_SOCKET, SO_MARK, &m_options.mark, sizeof(m_options.mark));
+#endif
+#ifdef SO_BINDTODEVICE
+        if (!m_options.bind_device.empty())
+            setsockopt(m_socket, SOL_SOCKET, SO_BINDTODEVICE,
+                       m_options.bind_device.c_str(), m_options.bind_device.size());
+#endif
+
+        // ── Timeouts ───────────────────────────────────────────
+        struct timeval tv;
+        tv.tv_sec = m_options.read_timeout / 1000;
+        tv.tv_usec = (m_options.read_timeout % 1000) * 1000;
+        setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        tv.tv_sec = m_options.write_timeout / 1000;
+        tv.tv_usec = (m_options.write_timeout % 1000) * 1000;
+        setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    }
+
     void tcp_stream::set_options(const hope::io::stream_options& opt) {
         HOPE_ASSERT(m_socket >= 0, "tcp_stream: set_options() called before connect()");
-        struct timeval timeout;
-        timeout.tv_sec = opt.write_timeout / 1000;
-        timeout.tv_usec = 1000 * (opt.write_timeout - timeout.tv_sec * 1000);
-        if (setsockopt(m_socket, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) HOPE_THROW_ERRNO("tcp_stream", "cannot set write timeout");
-        timeout.tv_sec = opt.read_timeout / 1000;
-        timeout.tv_usec = 1000 * (opt.read_timeout - timeout.tv_sec * 1000);
-        if (setsockopt(m_socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) HOPE_THROW_ERRNO("tcp_stream", "cannot set read timeout");
+        m_options = opt;
+        apply_constructor_options();
+        // Re-apply non_block_mode
         int flags = fcntl(m_socket, F_GETFL, 0);
-        if (flags == -1) HOPE_THROW_ERRNO("tcp_stream", "cannot get socket flags");
+        if (flags == -1) {
+            HOPE_THROW_ERRNO("tcp_stream", "cannot get socket flags");
+        }
         flags = opt.non_block_mode ? flags | O_NONBLOCK : flags & (~O_NONBLOCK);
-        if (fcntl(m_socket, F_SETFL, flags) == -1) HOPE_THROW_ERRNO("tcp_stream", "cannot set non-block flag");
+        if (fcntl(m_socket, F_SETFL, flags) == -1) {
+            HOPE_THROW_ERRNO("tcp_stream", "cannot set non-block flag");
+        }
     }
 
 

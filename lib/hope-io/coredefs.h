@@ -8,6 +8,11 @@
 
 #pragma once
 
+#include <cassert>
+#include <cerrno>
+#include <cstring>
+#include <string>
+
 #ifndef WEBSOCK_ENABLE
 #if defined(__clang__)
 #define WEBSOCK_ENABLE 0
@@ -22,8 +27,9 @@
 #endif
 #endif
 
-// TODO:: move to cmake variable
-//#define BUILD_WITH_EASY_PROFILER
+// Removed instrumentation features — kept as empty macros so that existing call sites still compile.
+#define NAMED_SCOPE(name)
+#define THREAD_SCOPE(name)
 
 // User error — programmer called the API wrong → assert in debug, noop in release
 #define HOPE_ASSERT(cond, msg) assert((cond) && msg)
@@ -37,16 +43,3 @@
     throw std::runtime_error(std::string("hope-io/") + component + ": " + msg + \
                              " [errno=" + std::to_string(errno) + " " + strerror(errno) + "]")
 
-#ifdef BUILD_WITH_EASY_PROFILER
-#include <easy/profiler.h>
-#define __STR__(s) #s
-#define THREAD_SCOPE(ThreadName) EASY_THREAD_SCOPE(__STR__(ThreadName))
-#define NAMED_SCOPE(Name) EASY_BLOCK(__STR__(Name))
-#define PROFILER_INIT EASY_PROFILER_ENABLE
-#define PROFILER_START_LISTEN profiler::startListen();
-#else
-#define THREAD_SCOPE(ThreadName)
-#define NAMED_SCOPE(Name)
-#define PROFILER_INIT
-#define PROFILER_START_LISTEN
-#endif

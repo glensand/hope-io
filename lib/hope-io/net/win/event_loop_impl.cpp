@@ -11,7 +11,6 @@
 #if PLATFORM_WINDOWS
 
 #include "hope-io/net/win/event_loop_impl.h"
-#include "hope-io/net/factory.h"
 
 namespace hope::io {
 

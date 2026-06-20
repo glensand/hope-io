@@ -10,7 +10,10 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/stream.h"
-#include "hope-io/net/factory.h"
+#include "hope-io/net/nix/tcp_stream.h"
+#include "hope-io/net/nix/tls_event_loop_impl.h"
+#include "hope-io/net/linux/tls_event_loop_impl.h"
+#include "hope-io/net/tls/tcp_tls_stream.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 #include <thread>
@@ -21,8 +24,8 @@
 
 using namespace std::chrono_literals;
 
-// Skip TLS tests if OpenSSL is not available or platform doesn't support event loop
-#if defined(HOPE_IO_USE_OPENSSL) && (PLATFORM_LINUX || PLATFORM_APPLE)
+// Skip TLS tests if platform doesn't support event loop
+#if PLATFORM_LINUX || PLATFORM_APPLE
 
 // RAII helper: owns a tls_event_loop + its thread, ensures stop/join on destruction
 struct TlsEventLoopGuard {
@@ -369,13 +372,121 @@ TEST_F(TlsEventLoopTest, TlsHandshakeFail) {
     EXPECT_GE(error_count.load(), 0);
 }
 
-#else
+// ── KTLS Event Loop Test ───────────────────────────────────────────────
 
-// If OpenSSL is not available or platform doesn't support event loops
-class TlsEventLoopTest : public ::testing::Test {};
+TEST_F(TlsEventLoopTest, KtlsFlagDoesNotBreakEventLoop) {
+    if (!certs_available()) {
+        GTEST_SKIP() << "TLS certificates not available";
+    }
 
-TEST_F(TlsEventLoopTest, TlsNotAvailable) {
-    GTEST_SKIP() << "TLS event loop not available on this platform or OpenSSL missing";
+    // Test that enable_ktls=true doesn't break the event loop — KTLS will
+    // gracefully fail to enable on unsupported kernels/ciphers, and the
+    // event loop falls back to standard SSL I/O.
+    TlsEventLoopGuard guard;
+    auto cfg = make_config();
+    cfg.enable_ktls = true;  // KTLS flag — no-op if unsupported
+
+    std::atomic<int> connect_count{0};
+    std::atomic<int> error_count{0};
+
+    hope::io::event_loop::callbacks cb;
+    cb.on_connect = [&connect_count](hope::io::event_loop::connection& conn) {
+        connect_count++;
+        conn.set_state(hope::io::event_loop::connection_state::read);
+    };
+    cb.on_read = [](hope::io::event_loop::connection& conn) {
+        conn.set_state(hope::io::event_loop::connection_state::write);
+    };
+    cb.on_write = [](hope::io::event_loop::connection& conn) {
+        conn.set_state(hope::io::event_loop::connection_state::read);
+    };
+    cb.on_err = [&error_count](hope::io::event_loop::connection&, const std::string&) {
+        error_count++;
+    };
+
+    guard.start(cfg, cb);
+    std::this_thread::sleep_for(100ms);
+
+    // Connect a TLS client and verify echo works
+    auto* tcp = new hope::io::tcp_stream();
+    auto* tls = new hope::io::tcp_tls_stream(tcp);
+    ASSERT_NE(tls, nullptr);
+    tls->connect("127.0.0.1", test_port);
+
+    const std::string msg = "KTLS event loop test";
+    tls->write(msg.data(), msg.size());
+
+    std::string reply(msg.size(), '\0');
+    std::size_t total = 0;
+    while (total < msg.size()) {
+        auto n = tls->read_once(reply.data() + total, msg.size() - total);
+        if (n == 0) break;
+        total += n;
+    }
+
+    EXPECT_EQ(total, msg.size());
+    EXPECT_EQ(reply, msg);
+
+    tls->disconnect();
+    delete tls;
+
+    std::this_thread::sleep_for(100ms);
+    EXPECT_GE(connect_count.load(), 1);
+    EXPECT_EQ(error_count.load(), 0);
 }
 
-#endif // HOPE_IO_USE_OPENSSL && (PLATFORM_LINUX || PLATFORM_APPLE)
+// ── KTLS-Enabled Stream Test ───────────────────────────────────────────
+
+TEST_F(TlsEventLoopTest, KtlsStreamFlagDoesNotBreakConnect) {
+    if (!certs_available()) {
+        GTEST_SKIP() << "TLS certificates not available";
+    }
+
+    // Test that a TCP TLS stream with ktls_enabled=true still connects
+    // and echoes correctly (KTLS is attempted but graceful fallback).
+    TlsEventLoopGuard guard;
+    auto cfg = make_config();
+    // Don't enable KTLS on the event loop — test the stream-level flag
+
+    hope::io::event_loop::callbacks cb;
+    cb.on_connect = [](hope::io::event_loop::connection& conn) {
+        conn.set_state(hope::io::event_loop::connection_state::read);
+    };
+    cb.on_read = [](hope::io::event_loop::connection& conn) {
+        conn.set_state(hope::io::event_loop::connection_state::write);
+    };
+    cb.on_write = [](hope::io::event_loop::connection& conn) {
+        conn.set_state(hope::io::event_loop::connection_state::read);
+    };
+    cb.on_err = [](hope::io::event_loop::connection&, const std::string&) {};
+
+    guard.start(cfg, cb);
+    std::this_thread::sleep_for(100ms);
+
+    // Create a TLS client with the KTLS flag set
+    auto* tcp = new hope::io::tcp_stream();
+    auto* tls = new hope::io::tcp_tls_stream(tcp);
+    ASSERT_NE(tls, nullptr);
+    tls->set_ktls_enabled(true);
+    tls->connect("127.0.0.1", test_port);
+
+    const std::string msg = "KTLS stream flag test";
+    tls->write(msg.data(), msg.size());
+
+    std::string reply(msg.size(), '\0');
+    std::size_t total = 0;
+    while (total < msg.size()) {
+        auto n = tls->read_once(reply.data() + total, msg.size() - total);
+        if (n == 0) break;
+        total += n;
+    }
+
+    EXPECT_EQ(total, msg.size());
+    EXPECT_EQ(reply, msg);
+
+    tls->disconnect();
+    delete tls;
+}
+
+#endif
+
