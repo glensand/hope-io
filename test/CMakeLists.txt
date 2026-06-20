@@ -38,21 +38,13 @@ target_include_directories(hope-io-test PRIVATE ../../lib)
 
 target_link_libraries(hope-io-test
     PRIVATE
-    hope-io
+    hope-io ssl crypto
     GTest::gtest
     GTest::gmock
 )
 
-# Find OpenSSL for TLS tests
-find_package(OpenSSL)
-if (OPENSSL_FOUND)
-  message("test/ Found openssl, TLS tests are available")
-  target_link_libraries(hope-io-test PRIVATE ${OPENSSL_LIBRARIES})
-  target_include_directories(hope-io-test PRIVATE ${OPENSSL_INCLUDE_DIR})
-  target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
-else()
-  message("test/ OpenSSL not found, TLS tests will be skipped")
-endif()
+target_compile_definitions(hope-io-test PRIVATE HOPE_IO_USE_OPENSSL)
+message("test/ Using BoringSSL, TLS tests are available")
 
 # Platform definitions for the TLS event loop test (must match lib/CMakeLists.txt)
 if(UNIX AND NOT APPLE)

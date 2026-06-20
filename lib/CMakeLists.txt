@@ -28,19 +28,13 @@ file(GLOB CL_SOURCES
 
 add_library(hope-io STATIC ${CL_HEADERS} ${CL_SOURCES})
 
-find_package(OpenSSL)
+# ── BoringSSL (git submodule at lib/boringssl) ─────────────────────────
+add_subdirectory(boringssl)
 
-if (OPENSSL_FOUND)
-    message("Hope-io/ Found openssl, tls features are available")
+target_compile_definitions(hope-io PUBLIC -DHOPE_IO_USE_OPENSSL)
+target_link_libraries(hope-io ssl crypto)
 
-    target_compile_definitions(hope-io PUBLIC -DHOPE_IO_USE_OPENSSL)
-    set(OPENSSL_USE_STATIC_LIBS TRUE)
-    target_link_libraries(hope-io ${OPENSSL_LIBRARIES})
-    target_include_directories(hope-io PUBLIC ${OPENSSL_INCLUDE_DIR})
-    message(${OPENSSL_INCLUDE_DIR})
-else ()
-    message("Hope-io/ OPenSSl not found, tls features is not available")
-endif ()
+message("Hope-io/ Using BoringSSL (submodule)")
 
 if(UNIX AND NOT APPLE)
     target_compile_definitions(hope-io PUBLIC -DPLATFORM_LINUX=1)
