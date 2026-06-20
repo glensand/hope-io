@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
             conn.set_state(hope::io::event_loop::connection_state::die);
         };
 
-        auto* event_loop = hope::io::create_event_loop();
+        auto* event_loop = new hope::io::event_loop_impl();
 
         // Run event loop in a separate thread
         std::thread loop_thread([event_loop, &cfg, &callbacks]() {

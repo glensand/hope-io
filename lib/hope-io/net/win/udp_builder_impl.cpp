@@ -15,9 +15,7 @@
 
 namespace hope::io {
 
-    udp_builder* create_udp_builder() {
-        return nullptr;
-    }
+
 
 }
 

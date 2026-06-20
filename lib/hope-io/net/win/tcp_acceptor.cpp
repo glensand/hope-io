@@ -74,7 +74,7 @@ namespace hope::io {
             throw std::runtime_error("hope-io/win_acceptor: accept failed");
         }
 
-        return hope::io::create_stream(new_socket);
+        return new tcp_stream(new_socket);
     }
 
     long long tcp_acceptor::raw() const {
@@ -85,9 +85,7 @@ namespace hope::io {
         // TODO:: implement
     }
 
-    acceptor* create_acceptor() {
-        return new tcp_acceptor();
-    }
+
 
 }
 

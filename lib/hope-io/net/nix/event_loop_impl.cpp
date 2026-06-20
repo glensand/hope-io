@@ -61,7 +61,7 @@ namespace hope::io {
             m_acceptor = cfg.custom_acceptor;
             m_owns_acceptor = false;
         } else {
-            m_acceptor = create_acceptor();
+            m_acceptor = new tcp_acceptor;
             m_acceptor->open(cfg.port);
             m_owns_acceptor = true;
         }
@@ -178,6 +178,6 @@ namespace hope::io {
         if (conn.buffer->is_empty()) cb.on_write(conn);
     }
 
-    event_loop* create_event_loop() { return new event_loop_impl; }
+
 }
 #endif

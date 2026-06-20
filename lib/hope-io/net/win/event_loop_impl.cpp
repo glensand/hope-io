@@ -15,9 +15,7 @@
 
 namespace hope::io {
 
-    event_loop* create_event_loop() {
-        return nullptr;
-    }
+
 
 }
 

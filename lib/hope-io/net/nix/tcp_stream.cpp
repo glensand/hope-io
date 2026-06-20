@@ -119,6 +119,6 @@ namespace hope::io {
         if (fcntl(m_socket, F_SETFL, flags) == -1) HOPE_THROW_ERRNO("tcp_stream", "cannot set non-block flag");
     }
 
-    stream* create_stream(unsigned long long socket) { return new tcp_stream(socket); }
+
 }
 #endif

@@ -69,9 +69,9 @@ namespace hope::io::http {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
-            stream = hope::io::create_stream();
+            stream = new hope::io::tcp_stream();
         } else {
-            stream = hope::io::create_tls_stream();
+            stream = new hope::io::tcp_tls_stream();
         }
         auto request_header = std::format("POST {} HTTP/1.1\r\n"
                                              "Host: {}\r\n"
@@ -101,9 +101,9 @@ namespace hope::io::http {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
-            stream = hope::io::create_stream();
+            stream = new hope::io::tcp_stream();
         } else {
-            stream = hope::io::create_tls_stream();
+            stream = new hope::io::tcp_tls_stream();
         }
         std::string body;
         for (auto&& [k, v] : params) {
@@ -166,9 +166,9 @@ namespace hope::io::http {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
-            stream = hope::io::create_stream();
+            stream = new hope::io::tcp_stream();
         } else {
-            stream = hope::io::create_tls_stream();
+            stream = new hope::io::tcp_tls_stream();
         }
         auto req = build_http_request(url.path, url.hostname, file_name, payload);
         stream->connect(url.hostname, url.port);
@@ -188,9 +188,9 @@ namespace hope::io::http {
         auto url = extract_url(endpoint);
         hope::io::stream* stream = nullptr;
         if (url.protocol == "http") {
-            stream = hope::io::create_stream();
+            stream = new hope::io::tcp_stream();
         } else {
-            stream = hope::io::create_tls_stream();
+            stream = new hope::io::tcp_tls_stream();
         }
 
         const std::string boundary = "----MyBoundary7d7b3d"; // can be more random

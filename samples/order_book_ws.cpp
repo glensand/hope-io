@@ -470,7 +470,7 @@ static void exchange_listener(const std::string& name,
                               const std::string& subscribe_msg,
                               int max_frames)
 {
-    auto* stream = hope::io::create_tls_stream();
+    auto* stream = new hope::io::tcp_tls_stream();
     try {
         stream->connect(host, port);
         ws_handshake(stream, host, path);

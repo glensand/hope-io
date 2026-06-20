@@ -75,9 +75,7 @@ namespace hope::io {
         return recv_bytes;
     }
 
-    udp_receiver* create_udp_receiver(unsigned long long socket) {
-        return new udp_receiver_impl(socket);
-    }
+
 
 }
 #endif

@@ -240,6 +240,6 @@ namespace hope::io {
         }
     }
 
-    event_loop* create_event_loop() { return new event_loop_impl; } 
+
 }
 #endif

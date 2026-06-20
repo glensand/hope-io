@@ -66,7 +66,7 @@ namespace hope::io {
              throw std::runtime_error("hope-io/tls_acceptor: cannot create key");
         }
 
-        m_tcp_acceptor = create_acceptor();
+        m_tcp_acceptor = new tcp_acceptor;
         m_tcp_acceptor->open(port);
     }
 
@@ -92,21 +92,12 @@ namespace hope::io {
         return m_tcp_acceptor->raw();
     }
 
-    acceptor* create_tls_acceptor(std::string_view key, std::string_view cert) {
-        return new tls_acceptor_impl(key, cert);
-    }
+
 
 }
 
 #else
 
-namespace hope::io {
 
-    acceptor* create_tls_acceptor(std::string_view, std::string_view) {
-        assert(false && "hope-io/ OpenSSL is not available");
-        return nullptr;
-    }
-
-}
 
 #endif

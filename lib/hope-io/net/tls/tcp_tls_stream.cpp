@@ -223,19 +223,12 @@ namespace hope::io {
         m_context = nullptr;
     }
 
-    stream* create_tls_stream(stream* tcp_str) {
-        return new tcp_tls_stream(static_cast<tcp_stream*>(tcp_str));
-    }
+
 
 }
 
 #else
 
-namespace hope::io {
-    stream* create_tls_stream(stream* tcp_stream) {
-        assert(false && "hope-io/ OpenSSL is not available");
-        return nullptr;
-    }
-}
+
 
 #endif

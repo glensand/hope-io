@@ -8,29 +8,6 @@
 
 #pragma once
 
-#include <string_view>
-
-namespace hope::io {
-
-    // TCP stuff
-    class acceptor* create_acceptor();
-    /// Pass \p socket == (unsigned long long)-1 for a new client stream (not connected yet). Never use 0 here: fd 0 is stdin.
-    class stream* create_stream(unsigned long long socket = static_cast<unsigned long long>(-1));
-        
-    // TLS stuff
-    class acceptor* create_tls_acceptor(std::string_view key, std::string_view cert);
-    class stream* create_tls_stream(stream* tcp_stream = nullptr);
-
-    // UDP stuff
-    class udp_receiver* create_udp_receiver(unsigned long long socket = 0);
-    class udp_sender* create_udp_sender(unsigned long long socket = 0);
-    class udp_builder* create_udp_builder();
-
-    // server loop
-    class event_loop* create_event_loop();
-
-}
-
 // ── Platform implementation headers ──────────────────────────────
 #if PLATFORM_LINUX || PLATFORM_APPLE
 #  include "hope-io/net/nix/tcp_stream.h"

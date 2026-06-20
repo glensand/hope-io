@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     }
     hope::io::init();
     try {
-        auto* stream = hope::io::create_stream();
+        auto* stream = new hope::io::tcp_stream();
         stream->connect("localhost", 1338);
         stream->set_options({});
         std::string msg = "Too few arguments were provided, please rerun app and provide name";

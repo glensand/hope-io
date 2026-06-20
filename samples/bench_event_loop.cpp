@@ -172,7 +172,7 @@ static void run_server(const bench_config& cfg, server_guard& sg) {
         scfg.epoll_timeout = 1000;
         sg.start(true, loop, std::move(scfg), std::move(cb));
     } else {
-        auto* loop = hope::io::create_event_loop();
+        auto* loop = new hope::io::event_loop_impl();
         hope::io::event_loop::config ecfg;
         ecfg.port        = cfg.port;
         ecfg.max_mutual_connections = 10000;
@@ -192,11 +192,11 @@ static void client_worker(const bench_config& cfg,
     // Create + connect stream
     hope::io::stream* s = nullptr;
     if (cfg.mode == "tls") {
-        auto* tcp = hope::io::create_stream();
+        auto* tcp = new hope::io::tcp_stream();
         if (!tcp) { buf.errors++; return; }
-        s = hope::io::create_tls_stream(tcp);
+        s = new hope::io::tcp_tls_stream(static_cast<hope::io::tcp_stream*>(tcp));
     } else {
-        s = hope::io::create_stream();
+        s = new hope::io::tcp_stream();
     }
     if (!s) { buf.errors++; return; }
 

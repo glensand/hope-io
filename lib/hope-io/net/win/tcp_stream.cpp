@@ -210,9 +210,7 @@ namespace hope::io {
         assert(false && "Not implemented");
     }
 
-    stream* create_stream(unsigned long long socket) {
-        return new tcp_stream(socket);
-    }
+
 
 }
 

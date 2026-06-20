@@ -7,7 +7,7 @@
 
 int main() {
     hope::io::init_tls();
-    auto* stream = hope::io::create_tls_stream();
+    auto* stream = new hope::io::tcp_tls_stream();
     try {
         stream->connect("api.binance.com", 443);
 

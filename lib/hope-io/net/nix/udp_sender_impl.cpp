@@ -72,9 +72,7 @@ namespace hope::io {
         }
     }
 
-    udp_sender* create_udp_sender(unsigned long long socket) {
-        return new udp_sender_impl(socket);
-    }
+
 
 }
 #endif

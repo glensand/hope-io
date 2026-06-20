@@ -18,6 +18,12 @@ foreach(source ${SAMPLE_CORE_SOURCES})
 
     target_include_directories(${target_name} PUBLIC ../../lib)
 
+    # TLS library label for bench_tls_latency (default: OpenSSL)
+    if(NOT TLS_LIB_LABEL)
+        set(TLS_LIB_LABEL "OpenSSL")
+    endif()
+    target_compile_definitions(${target_name} PRIVATE TLS_LIB_LABEL="${TLS_LIB_LABEL}")
+
     # Platform definitions (must match lib/CMakeLists.txt)
     if(UNIX AND NOT APPLE)
         target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=1 PLATFORM_APPLE=0 PLATFORM_WINDOWS=0)

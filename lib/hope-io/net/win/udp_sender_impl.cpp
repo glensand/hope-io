@@ -15,9 +15,7 @@
 
 namespace hope::io {
 
-    udp_sender* create_udp_sender(unsigned long long) {
-        return nullptr;
-    }
+
 
 }
 

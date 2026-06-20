@@ -9,7 +9,7 @@ int main() {
     const std::string message = "TG via hope/io";
 
     hope::io::init_tls();
-    auto* stream = hope::io::create_tls_stream();
+    auto* stream = new hope::io::tcp_tls_stream();
 
     const char* host = "api.telegram.org";
     stream->connect(host, 443);

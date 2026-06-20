@@ -38,7 +38,7 @@ namespace hope::io {
         if ((client_socket = ::accept(m_socket, (struct sockaddr *)&client_sockaddr, &sin_size)) == -1) {
             HOPE_THROW_ERRNO("tcp_acceptor", "cannot accept connection");
         }
-        return create_stream((unsigned long long)client_socket);
+        return new tcp_stream((unsigned long long)client_socket);
     }
 
     void tcp_acceptor::open(std::size_t port) {
@@ -87,9 +87,7 @@ namespace hope::io {
 
     long long tcp_acceptor::raw() const { return m_socket; }
 
-    acceptor* create_acceptor() {
-        return new tcp_acceptor;
-    }
+
 
 }
 #endif
