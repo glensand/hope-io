@@ -14,8 +14,25 @@ else()
     message("sample/ liburing NOT found")
 endif()
 
+# Linux-only samples that unconditionally include <liburing.h> or <linux/tls.h>
+set(LINUX_ONLY_SAMPLES
+    io_uring_echo_server
+    io_uring_echo_client
+    bench_tls_io_uring
+    bench_tls_io_uring_ktls
+    bench_tls_raw
+    bench_tls_ktls
+)
+
 file(GLOB SAMPLE_CORE_SOURCES
         *.cpp)
+
+# Remove Linux-only samples on non-Linux platforms
+if(APPLE OR WIN32)
+    foreach(target_name ${LINUX_ONLY_SAMPLES})
+        list(REMOVE_ITEM SAMPLE_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${target_name}.cpp)
+    endforeach()
+endif()
 
 foreach(source ${SAMPLE_CORE_SOURCES})
     get_filename_component(filename ${source} NAME)
