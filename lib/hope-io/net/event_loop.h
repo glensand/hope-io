@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include "hope-io/net/stream.h"
+#include "hope-io/net/acceptor.h"
 
 namespace hope::io::el {
 
@@ -32,7 +33,7 @@ namespace hope::io::el {
         std::size_t max_accepts_per_tick = 128;
         std::size_t port = 9393;
         int epoll_temeout = 1000;
-        class acceptor* custom_acceptor = nullptr;  // If provided, this acceptor will be used instead of creating a default one
+        hope::io::acceptor* custom_acceptor = nullptr;  // If provided, this acceptor will be used instead of creating a default one
         stream_options accepted_stream_options;     // Socket options applied to each accepted connection
     };
 

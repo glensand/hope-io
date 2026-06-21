@@ -191,18 +191,18 @@ namespace hope::io::el {
         //   write -> add EVFILT_WRITE
         //   read  -> delete EVFILT_WRITE
         //   die   -> remove connection entirely
-        void apply_state(connection& conn, connection_state state) {
-            if (state == connection_state::die) {
+        void apply_state(connection& conn, el_connection_state state) {
+            if (state == el_connection_state::die) {
                 remove_connection(conn.descriptor);
                 return;
             }
             conn.set_state(state);
 
             struct kevent ev;
-            if (state == connection_state::write) {
+            if (state == el_connection_state::write) {
                 EV_SET(&ev, conn.descriptor, EVFILT_WRITE, EV_ADD, 0, 0, nullptr);
                 kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
-            } else if (state == connection_state::read) {
+            } else if (state == el_connection_state::read) {
                 EV_SET(&ev, conn.descriptor, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
                 kevent(m_kq, &ev, 1, nullptr, 0, nullptr);
             }
@@ -256,7 +256,7 @@ namespace hope::io::el {
                     register_connection(sock, ssl);
                     auto& conn = const_cast<connection&>(*m_connections.find(sock));
                     auto state = m_callbacks.on_connect(conn);
-                    if (state == connection_state::die) {
+                    if (state == el_connection_state::die) {
                         remove_connection(sock);
                         continue;
                     }
@@ -286,7 +286,7 @@ namespace hope::io::el {
                 register_connection(sock, tls.ssl);
                 auto& conn = const_cast<connection&>(*m_connections.find(sock));
                 auto state = m_callbacks.on_connect(conn);
-                if (state == connection_state::die) {
+                if (state == el_connection_state::die) {
                     remove_connection(sock);
                     return;
                 }
@@ -318,7 +318,7 @@ namespace hope::io::el {
 
         void handle_read(connection& conn) {
             NAMED_SCOPE(TlsKqHandleRead);
-            if (conn.get_state() != connection_state::read) return;
+            if (conn.get_state() != el_connection_state::read) return;
 
             bool error = false;
             bool got_data = false;
@@ -353,13 +353,13 @@ namespace hope::io::el {
                 apply_state(conn, state);
             }
             if (error) {
-                apply_state(conn, connection_state::die);
+                apply_state(conn, el_connection_state::die);
             }
         }
 
         void handle_write(connection& conn) {
             NAMED_SCOPE(TlsKqHandleWrite);
-            if (conn.get_state() != connection_state::write) return;
+            if (conn.get_state() != el_connection_state::write) return;
 
             auto& tls = m_tls_states[conn.descriptor];
 
@@ -373,7 +373,7 @@ namespace hope::io::el {
                     return 0;
                 }
                 m_callbacks.on_err(conn, "SSL_write failed");
-                apply_state(conn, connection_state::die);
+                apply_state(conn, el_connection_state::die);
                 return size;
             });
 

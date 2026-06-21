@@ -11,6 +11,7 @@
 #include "hope-io/coredefs.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/stream_options_util.h"
+#include "hope-io/net/nix/tcp_acceptor.h"
 
 #if PLATFORM_APPLE
 
@@ -53,7 +54,7 @@ namespace hope::io::el {
                 m_acceptor = cfg.custom_acceptor;
                 m_owns_acceptor = false;
             } else {
-                m_acceptor = new tcp_acceptor;
+                m_acceptor = new hope::io::tcp_acceptor;
                 m_acceptor->open(cfg.port);
                 m_owns_acceptor = true;
             }
@@ -135,11 +136,9 @@ namespace hope::io::el {
         }
 
     private:
-        struct tcp_acceptor;
 
 
-
-        void apply_state(connection& conn, connection_state state) {
+        void apply_state(connection& conn, el_connection_state state) {
             if (state == el_connection_state::die) {
                 do_remove_connection(conn.descriptor);
                 return;

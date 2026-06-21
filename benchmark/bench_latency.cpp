@@ -34,7 +34,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#if PLATFORM_LINUX
 #include <linux/tls.h>
+#endif
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -183,8 +185,8 @@ static SSL_CTX* create_ctx(bool is_server, const bench_config& cfg) {
     return ctx;
 }
 
-// ── KTLS enable ──────────────────────────────────────────────────────
-
+// ── KTLS enable (Linux only) ───────────────────────────────────────────
+#if PLATFORM_LINUX
 static void enable_ktls(SSL* ssl, int fd, bool is_server) {
     size_t key_len = SSL_get_key_block_len(ssl);
     std::vector<uint8_t> key_block(key_len);
@@ -217,6 +219,7 @@ static void enable_ktls(SSL* ssl, int fd, bool is_server) {
     if (setsockopt(fd, SOL_TLS, TLS_TX, &tx_info, sizeof(tx_info)) < 0) { perror("TLS_TX"); throw std::runtime_error("KTLS TX failed"); }
     if (setsockopt(fd, SOL_TLS, TLS_RX, &rx_info, sizeof(rx_info)) < 0) { perror("TLS_RX"); throw std::runtime_error("KTLS RX failed"); }
 }
+#endif
 
 // ── Per-configuration server/client threads ──────────────────────────
 
@@ -264,6 +267,7 @@ static void server_thread(int listen_fd, const bench_run& run, SSL_CTX* ctx) {
         SSL_set_fd(ssl, client_fd);
         if (SSL_accept(ssl) <= 0) { SSL_free(ssl); close(client_fd); return; }
 
+#if PLATFORM_LINUX
         if (std::string(run.mode) == "ktls") {
             try {
                 enable_ktls(ssl, client_fd, true);
@@ -272,6 +276,7 @@ static void server_thread(int listen_fd, const bench_run& run, SSL_CTX* ctx) {
                 SSL_free(ssl); close(client_fd); return;
             }
         }
+#endif
     }
 
     std::vector<char> buf(65536);
@@ -331,6 +336,7 @@ static run_result run_config(const bench_config& cfg, const bench_run& run, int 
             fprintf(stderr, "client SSL handshake failed\n");
             exit(1);
         }
+#if PLATFORM_LINUX
         if (std::string(run.mode) == "ktls") {
             try {
                 enable_ktls(c_ssl, client_fd, false);
@@ -344,6 +350,7 @@ static run_result run_config(const bench_config& cfg, const bench_run& run, int 
                 return result;
             }
         }
+#endif
     }
 
     std::string payload(cfg.payload, 'x');
