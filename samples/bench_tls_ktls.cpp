@@ -8,7 +8,7 @@
  * Handshake with BoringSSL, extract keys via SSL_generate_key_block,
  * program KTLS via setsockopt(TCP_ULP), then raw read/write.
  *
- * Socket settings: TCP_NODELAY + SO_SNDBUF=262144 + SO_RCVBUF=262144.
+ * Socket settings: TCP_NODELAY only, default buffer sizes.
  *
  * Compile:
  *   g++ -O3 -Ilib/boringssl/include -Ilib bench_tls_ktls.cpp \
@@ -321,7 +321,7 @@ static run_result compute(const sample_buf& buf, size_t payload) {
 static void print_header() {
     printf("\n");
     printf("═══ TLS 1.2 Echo Latency (KTLS) ═════════════════════════\n");
-    printf("  socket: TCP_NODELAY + SO_RCVBUF=262144 + SO_SNDBUF=262144\n");
+    printf("  socket: TCP_NODELAY only, default buffer sizes\n");
     printf("  I/O:    KTLS (BoringSSL key extraction + setsockopt)\n");
     printf("════════════════════════════════════════════════════════\n");
 }

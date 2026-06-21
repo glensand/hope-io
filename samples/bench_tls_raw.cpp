@@ -52,7 +52,7 @@ static constexpr size_t MAX_SAMPLES     = 8u << 20;
 static constexpr int    DEFAULT_PORT    = 14443;
 static constexpr int    DEFAULT_ITER    = 50000;
 static constexpr int    DEFAULT_WARMUP  = 2000;
-static constexpr int    DEFAULT_VARIANT = 3;   // bigbufs (TCP_NODELAY + both buffers)
+static constexpr int    DEFAULT_VARIANT = 0;   // baseline (TCP_NODELAY only, default buffer sizes)
 
 static constexpr int DEFAULT_SIZES[]    = { 64, 200, 1024, 4096, 16384, 65536 };
 static constexpr int DEFAULT_NUM_SIZES  = 6;

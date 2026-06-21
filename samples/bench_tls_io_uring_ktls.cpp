@@ -8,7 +8,7 @@
  * Server uses blocking KTLS (unchanged).
  * Client uses io_uring for the raw I/O after KTLS is enabled.
  *
- * Socket settings: TCP_NODELAY + SO_SNDBUF=262144 + SO_RCVBUF=262144.
+ * Socket settings: TCP_NODELAY only, default buffer sizes.
  * TLS 1.2 forced.
  *
  * Compile:
@@ -387,7 +387,7 @@ static run_result compute(const sample_buf& buf, size_t payload) {
 static void print_header() {
     printf("\n");
     printf("═══ TLS 1.2 Echo Latency (io_uring + KTLS) ═══════════\n");
-    printf("  socket: TCP_NODELAY + SO_RCVBUF=262144 + SO_SNDBUF=262144\n");
+    printf("  socket: TCP_NODELAY only, default buffer sizes\n");
     printf("  server: KTLS blocking  client: KTLS + io_uring\n");
     printf("════════════════════════════════════════════════════════\n");
 }

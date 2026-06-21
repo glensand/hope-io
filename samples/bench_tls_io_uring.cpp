@@ -5,7 +5,7 @@
  * ── io_uring + TLS Echo Latency Benchmark ──────────────────────────
  *
  * Copy of bench_tls_raw with io_uring poll + BoringSSL socket BIO.
- * Socket settings: TCP_NODELAY + SO_SNDBUF=262144 + SO_RCVBUF=262144.
+ * Socket settings: TCP_NODELAY only, default buffer sizes.
  * TLS 1.2 forced (matches KTLS variant).
  *
  * Compile:
