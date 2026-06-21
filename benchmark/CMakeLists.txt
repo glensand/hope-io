@@ -6,31 +6,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
-# Detect liburing (needed for io_uring samples)
+# Detect liburing (needed for io_uring event loop bench)
 find_library(LIBURING_LIB uring)
 if(LIBURING_LIB)
-    message("sample/ liburing found")
+    message("benchmark/ liburing found")
 else()
-    message("sample/ liburing NOT found")
+    message("benchmark/ liburing NOT found")
 endif()
 
-# Linux-only samples that unconditionally include <liburing.h> or <linux/tls.h>
-set(LINUX_ONLY_SAMPLES
-    io_uring_echo_server
-    io_uring_echo_client
-)
+file(GLOB BENCH_SOURCES *.cpp)
 
-file(GLOB SAMPLE_CORE_SOURCES
-        *.cpp)
-
-# Remove Linux-only samples on non-Linux platforms
-if(APPLE OR WIN32)
-    foreach(target_name ${LINUX_ONLY_SAMPLES})
-        list(REMOVE_ITEM SAMPLE_CORE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${target_name}.cpp)
-    endforeach()
-endif()
-
-foreach(source ${SAMPLE_CORE_SOURCES})
+foreach(source ${BENCH_SOURCES})
     get_filename_component(filename ${source} NAME)
     get_filename_component(target_name ${source} NAME_WE)
 
@@ -39,16 +25,10 @@ foreach(source ${SAMPLE_CORE_SOURCES})
     target_include_directories(${target_name} PUBLIC ../../lib)
     target_link_libraries(${target_name} hope-io ssl crypto)
 
-    # io_uring samples need liburing
-    if(LIBURING_LIB AND target_name MATCHES "io_uring")
+    # bench_latency needs liburing if available
+    if(LIBURING_LIB AND target_name MATCHES "bench_latency")
         target_link_libraries(${target_name} uring)
     endif()
-
-    # TLS library label
-    if(NOT TLS_LIB_LABEL)
-        set(TLS_LIB_LABEL "BoringSSL")
-    endif()
-    target_compile_definitions(${target_name} PRIVATE TLS_LIB_LABEL="${TLS_LIB_LABEL}")
 
     # Platform definitions (must match lib/CMakeLists.txt)
     if(UNIX AND NOT APPLE)
@@ -59,5 +39,10 @@ foreach(source ${SAMPLE_CORE_SOURCES})
         target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=0 PLATFORM_APPLE=0 PLATFORM_WINDOWS=1)
     endif()
 
-    message("sample/ ${target_name}: linking BoringSSL")
+    # io_uring availability (must match lib/CMakeLists.txt)
+    if(LIBURING_LIB)
+        target_compile_definitions(${target_name} PRIVATE HOPE_IO_URING_ENABLED=1)
+    endif()
+
+    message("benchmark/ ${target_name}: linking BoringSSL")
 endforeach()

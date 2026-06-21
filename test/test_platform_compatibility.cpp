@@ -317,15 +317,15 @@ TEST_F(PlatformCompatibilityTest, UdpPlatformDifferences) {
 
 // Test event loop platform differences
 TEST_F(PlatformCompatibilityTest, EventLoopPlatformDifferences) {
-    auto* loop2 = new hope::io::event_loop_impl();
-
-#if PLATFORM_WINDOWS
-    // On Windows, event loop is not implemented
-    EXPECT_EQ(loop2, nullptr);
-#else
-    // On Unix/Apple, event loop should be available
+#if PLATFORM_LINUX || PLATFORM_APPLE
+    auto on_c = [](hope::io::el::connection&) { return hope::io::el::el_connection_state::read; };
+    auto on_r = [](hope::io::el::connection&) { return hope::io::el::el_connection_state::read; };
+    auto on_w = [](hope::io::el::connection&) { return hope::io::el::el_connection_state::read; };
+    auto on_e = [](hope::io::el::connection&, const std::string&) { return hope::io::el::el_connection_state::die; };
+    auto* loop2 = new hope::io::el::event_loop_impl_t(
+        std::move(on_c), std::move(on_r), std::move(on_w), std::move(on_e)
+    );
     ASSERT_NE(loop2, nullptr);
-
     delete loop2;
 #endif
 }

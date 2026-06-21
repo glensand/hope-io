@@ -10,8 +10,7 @@
 #include "message.h"
 
 #include "hope-io/net/event_loop.h"
-#include "hope-io/net/tls/tls_acceptor_impl.h"
-#include "hope-io/net/linux/event_loop_impl.h"
+#include "hope-io/net/linux/tls_event_loop_impl.h"
 #include "hope-io/net/init.h"
 #include "hope-io/net/tls/tls_init.h"
 
@@ -19,9 +18,6 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
-
-// Global event loop pointer for stop signal
-hope::io::event_loop* g_event_loop = nullptr;
 
 int main(int argc, char *argv[]) {
     hope::io::init();
@@ -33,52 +29,64 @@ int main(int argc, char *argv[]) {
     const std::size_t port = 1443;  // TLS echo server port
 
     try {
-        // Create TLS acceptor (wraps TCP acceptor, adds TLS layer)
-        auto* tls_acceptor = new hope::io::tls_acceptor_impl(key_path, cert_path);
-        tls_acceptor->open(port);
-
         std::cout << "TLS Event Loop Server started on port " << port << std::endl;
 
-        // Configure event loop to use our TLS acceptor
-        hope::io::event_loop::config cfg;
-        cfg.custom_acceptor = tls_acceptor;  // Use the TLS acceptor instead of default TCP
-        cfg.max_mutual_connections = 100;
-        cfg.max_accepts_per_tick = 10;
-        cfg.epoll_temeout = 1000;
+        using conn_state = hope::io::el::el_connection_state;
 
         // Set up callbacks for the event loop
-        hope::io::event_loop::callbacks callbacks;
-
-        callbacks.on_connect = [](hope::io::event_loop::connection& conn) {
-            std::cout << "New TLS connection fd: " << conn.descriptor << std::endl;
-            conn.set_state(hope::io::event_loop::connection_state::read);
+        auto on_connect = [](auto& c) {
+            std::cout << "New TLS connection fd: " << c.descriptor << std::endl;
+            return conn_state::read;
         };
 
-        callbacks.on_read = [](hope::io::event_loop::connection& conn) {
-            std::cout << "Data received from fd: " << conn.descriptor << std::endl;
-            
+        auto on_read = [](auto& c) {
+            std::cout << "Data received from fd: " << c.descriptor << std::endl;
+
             // Echo back the data: change to write state
-            conn.set_state(hope::io::event_loop::connection_state::write);
+            return conn_state::write;
         };
 
-        callbacks.on_write = [](hope::io::event_loop::connection& conn) {
-            std::cout << "Data sent to fd: " << conn.descriptor << std::endl;
-            
+        auto on_write = [](auto& c) {
+            std::cout << "Data sent to fd: " << c.descriptor << std::endl;
+
             // Go back to read state for more data
-            conn.set_state(hope::io::event_loop::connection_state::read);
+            return conn_state::read;
         };
 
-        callbacks.on_err = [](hope::io::event_loop::connection& conn, const std::string& error) {
-            std::cout << "Error on connection fd " << conn.descriptor << ": " << error << std::endl;
-            conn.set_state(hope::io::event_loop::connection_state::die);
+        auto on_err = [](auto& c, const std::string& error) {
+            std::cout << "Error on connection fd " << c.descriptor << ": " << error << std::endl;
+            return conn_state::die;
         };
 
-        auto* event_loop = new hope::io::event_loop_impl();
+        // Define the concrete event loop type from the lambdas
+        using loop_type = hope::io::el::tls_event_loop_impl<
+            std::decay_t<decltype(on_read)>,
+            std::decay_t<decltype(on_write)>,
+            std::decay_t<decltype(on_err)>,
+            std::decay_t<decltype(on_connect)>
+        >;
+
+        auto* g_event_loop = static_cast<loop_type*>(nullptr);
+        auto* event_loop = new loop_type(
+            std::move(on_connect),
+            std::move(on_read),
+            std::move(on_write),
+            std::move(on_err)
+        );
         g_event_loop = event_loop;
 
+        // Configure TLS event loop with cert paths and port
+        hope::io::el::tls_config cfg;
+        cfg.cert_path = cert_path;
+        cfg.key_path = key_path;
+        cfg.port = port;
+        cfg.max_mutual_connections = 100;
+        cfg.max_accepts_per_tick = 10;
+        cfg.epoll_timeout = 1000;
+
         // Run event loop in a separate thread so we can stop it from main
-        std::thread loop_thread([event_loop, &cfg, &callbacks]() {
-            event_loop->run(cfg, std::move(callbacks));
+        std::thread loop_thread([event_loop, &cfg]() {
+            event_loop->run(cfg);
         });
 
         // Simple shutdown after 30 seconds or on user input
@@ -86,12 +94,11 @@ int main(int argc, char *argv[]) {
         std::cin.get();
 
         std::cout << "Stopping event loop..." << std::endl;
-        event_loop->stop();
+        g_event_loop->stop();
 
         loop_thread.join();
 
         delete event_loop;
-        delete tls_acceptor;
 
         std::cout << "Server stopped." << std::endl;
     }

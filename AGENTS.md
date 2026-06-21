@@ -127,13 +127,15 @@ All tests **must pass**. Do not claim tests pass without running them.
 
 ### 4.3 Run All Benchmarks
 
-Benchmarks are sample executables in `build/bin/`. Run them briefly to verify they don't crash:
+Benchmarks are executables in `benchmark/`, built to `build/bin/`. Run them briefly to verify they don't crash:
 
 ```bash
 ./build/bin/bench_event_loop --mode tcp --payload 64 --connections 10 --duration 2
 ```
 
 Each benchmark must start, run, and complete without crashing. You do not need to analyze the numbers, but you must verify no crashes or assertions.
+
+See `benchmark/CMakeLists.txt` for the full list of benchmarks and their platform requirements.
 
 ---
 

@@ -21,21 +21,43 @@
 #include <atomic>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 using namespace std::chrono_literals;
+using namespace hope::io::el;
 
 // Skip TLS tests if platform doesn't support event loop
 #if PLATFORM_LINUX || PLATFORM_APPLE
 
-// RAII helper: owns a tls_event_loop + its thread, ensures stop/join on destruction
+// ── Helpers ────────────────────────────────────────────────────────────
+
+// Return numeric values for connection_state enum members without naming the type.
+// The values match: idle=0, read=1, write=2, die=3.
+enum : int8_t { kStateRead = 1, kStateWrite = 2, kStateDie = 3 };
+
+// RAII helper: owns a TLS event loop + its thread, ensures stop/join on destruction
+template<typename Loop>
 struct TlsEventLoopGuard {
-    hope::io::tls_event_loop* loop = nullptr;
+    Loop* loop = nullptr;
     std::thread thread;
 
-    void start(hope::io::tls_event_loop::tls_config& cfg, hope::io::event_loop::callbacks& cb) {
-        loop = new hope::io::tls_event_loop_impl();
-        thread = std::thread([this, &cfg, &cb]() {
-            loop->run(cfg, std::move(cb));
+    TlsEventLoopGuard() = default;
+    TlsEventLoopGuard(TlsEventLoopGuard&& o) noexcept
+        : loop(o.loop), thread(std::move(o.thread)) { o.loop = nullptr; }
+    TlsEventLoopGuard& operator=(TlsEventLoopGuard&& o) noexcept {
+        if (this != &o) {
+            if (loop) { loop->stop(); if (thread.joinable()) thread.join(); delete loop; }
+            loop = o.loop;
+            thread = std::move(o.thread);
+            o.loop = nullptr;
+        }
+        return *this;
+    }
+
+    void start(Loop* l, tls_config& cfg) {
+        loop = l;
+        thread = std::thread([l, &cfg]() {
+            l->run(cfg);
         });
     }
 
@@ -47,6 +69,33 @@ struct TlsEventLoopGuard {
         }
     }
 };
+
+// Constructs a TlsEventLoopGuard, deducing template params from the callbacks.
+template<typename TOnRead, typename TOnWrite, typename TOnError, typename TConnected>
+auto make_tls_guard(tls_config& cfg,
+                    TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error) {
+    using loop_t = tls_event_loop_impl<TOnRead, TOnWrite, TOnError, TConnected>;
+    TlsEventLoopGuard<loop_t> guard;
+    guard.start(new loop_t(std::forward<TConnected>(on_connect), std::forward<TOnRead>(on_read),
+                           std::forward<TOnWrite>(on_write), std::forward<TOnError>(on_error)), cfg);
+    return guard;
+}
+
+// Create a tls_config with a given port.
+inline tls_config make_tls_config(std::size_t port,
+                                   const std::string& cert_path,
+                                   const std::string& key_path) {
+    tls_config cfg;
+    cfg.port = port;
+    cfg.cert_path = cert_path;
+    cfg.key_path = key_path;
+    cfg.max_mutual_connections = 10;
+    cfg.max_accepts_per_tick = 5;
+    cfg.epoll_timeout = 100;
+    return cfg;
+}
+
+// ── Test fixture ───────────────────────────────────────────────────────
 
 class TlsEventLoopTest : public ::testing::Test {
 protected:
@@ -62,7 +111,6 @@ protected:
 
     std::size_t test_port = 0;
 
-    // Path to test certificates (relative to build dir)
     std::string cert_path() const {
         const char* paths[] = {
             "../test/certs/cert.pem",
@@ -93,81 +141,70 @@ protected:
         std::ifstream c(cert_path()), k(key_path());
         return c.good() && k.good();
     }
-
-    hope::io::tls_event_loop::tls_config make_config() {
-        hope::io::tls_event_loop::tls_config cfg;
-        cfg.port = test_port;
-        cfg.cert_path = cert_path();
-        cfg.key_path = key_path();
-        cfg.max_mutual_connections = 10;
-        cfg.max_accepts_per_tick = 5;
-        cfg.epoll_timeout = 100;
-        return cfg;
-    }
 };
 
-// Test TLS event loop creation
+// ── Tests ──────────────────────────────────────────────────────────────
+
 TEST_F(TlsEventLoopTest, CreateTlsEventLoop) {
-    auto* loop = new hope::io::tls_event_loop_impl();
+    // Each lambda gets its own type — we need one distinct lambda per callback.
+    auto c = [](connection&) { return el_connection_state::read; };
+    auto r = [](connection&) { return el_connection_state::read; };
+    auto w = [](connection&) { return el_connection_state::read; };
+    auto e = [](connection&, const std::string&) { return el_connection_state::die; };
+    auto* loop = new tls_event_loop_impl(
+        std::move(c), std::move(r), std::move(w), std::move(e));
     ASSERT_NE(loop, nullptr);
     delete loop;
 }
 
-// Test TLS event loop run and stop
 TEST_F(TlsEventLoopTest, RunAndStop) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [](hope::io::event_loop::connection&) {};
-    cb.on_read = [](hope::io::event_loop::connection&) {};
-    cb.on_write = [](hope::io::event_loop::connection&) {};
-    cb.on_err = [](hope::io::event_loop::connection&, const std::string&) {};
+    auto on_connect = [](connection&) { return el_connection_state::read; };
+    auto on_read = [](connection&) { return el_connection_state::read; };
+    auto on_write = [](connection&) { return el_connection_state::read; };
+    auto on_err = [](connection&, const std::string&) { return el_connection_state::die; };
 
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
-    // guard destructor stops the loop and joins
 }
 
-// Test TLS event loop echo with a single TLS client
 TEST_F(TlsEventLoopTest, TlsEchoSingleClient) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
-
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
 
     std::atomic<int> connect_count{0};
     std::atomic<int> read_count{0};
     std::atomic<int> write_count{0};
     std::atomic<int> error_count{0};
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [&connect_count](hope::io::event_loop::connection& conn) {
+    auto on_connect = [&connect_count](connection&) {
         connect_count++;
-        conn.set_state(hope::io::event_loop::connection_state::read);
+        return el_connection_state::read;
     };
-    cb.on_read = [&read_count](hope::io::event_loop::connection& conn) {
+    auto on_read = [&read_count](connection&) {
         read_count++;
-        conn.set_state(hope::io::event_loop::connection_state::write);
+        return el_connection_state::write;
     };
-    cb.on_write = [&write_count](hope::io::event_loop::connection& conn) {
+    auto on_write = [&write_count](connection&) {
         write_count++;
-        // Stay in read — don't close. Client disconnect will trigger EV_EOF.
-        conn.set_state(hope::io::event_loop::connection_state::read);
+        return el_connection_state::read;
     };
-    cb.on_err = [&error_count](hope::io::event_loop::connection&, const std::string&) {
+    auto on_err = [&error_count](connection&, const std::string&) {
         error_count++;
+        return el_connection_state::die;
     };
 
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
-    // Create TLS client
     auto* tcp_stream = new hope::io::tcp_stream();
     ASSERT_NE(tcp_stream, nullptr);
     auto* tls_client = new hope::io::tcp_tls_stream(tcp_stream);
@@ -177,17 +214,15 @@ TEST_F(TlsEventLoopTest, TlsEchoSingleClient) {
     const std::string test_message = "Hello from TLS event loop test!";
     tls_client->write(test_message.c_str(), test_message.length());
 
-    // Small delay to let the server echo back
     std::this_thread::sleep_for(200ms);
 
-    // Read echo — use read_once with a loop to handle partial reads gracefully
     std::string response;
     response.resize(test_message.size());
     std::size_t total_read = 0;
     while (total_read < test_message.size()) {
         auto n = tls_client->read_once(response.data() + total_read,
                                         test_message.size() - total_read);
-        if (n == 0) break; // EOF or WANT_READ — let the server close gracefully
+        if (n == 0) break;
         total_read += n;
     }
 
@@ -203,41 +238,36 @@ TEST_F(TlsEventLoopTest, TlsEchoSingleClient) {
     EXPECT_GE(connect_count.load(), 1);
     EXPECT_GE(read_count.load(), 1);
     EXPECT_GE(write_count.load(), 1);
-    // error_count may be >0 if close_notify races with our checks
 }
 
-// Test TLS event loop echo with multiple concurrent clients
 TEST_F(TlsEventLoopTest, TlsEchoMultipleClients) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
-    cfg.max_mutual_connections = 20;
-    cfg.max_accepts_per_tick = 10;
-
     std::atomic<int> connect_count{0};
     std::atomic<int> read_count{0};
     std::atomic<int> error_count{0};
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [&connect_count](hope::io::event_loop::connection& conn) {
+    auto on_connect = [&connect_count](connection&) {
         connect_count++;
-        conn.set_state(hope::io::event_loop::connection_state::read);
+        return el_connection_state::read;
     };
-    cb.on_read = [&read_count](hope::io::event_loop::connection& conn) {
+    auto on_read = [&read_count](connection&) {
         read_count++;
-        conn.set_state(hope::io::event_loop::connection_state::write);
+        return el_connection_state::write;
     };
-    cb.on_write = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::read);
+    auto on_write = [](connection&) {
+        return el_connection_state::read;
     };
-    cb.on_err = [&error_count](hope::io::event_loop::connection&, const std::string&) {
+    auto on_err = [&error_count](connection&, const std::string&) {
         error_count++;
+        return el_connection_state::die;
     };
 
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
     constexpr int N_CLIENTS = 5;
@@ -274,29 +304,19 @@ TEST_F(TlsEventLoopTest, TlsEchoMultipleClients) {
     EXPECT_EQ(error_count.load(), 0);
 }
 
-// Test TLS event loop with large message
 TEST_F(TlsEventLoopTest, TlsLargeMessage) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
+    auto on_connect = [](connection&) { return el_connection_state::read; };
+    auto on_read = [](connection&) { return el_connection_state::write; };
+    auto on_write = [](connection&) { return el_connection_state::read; };
+    auto on_err = [](connection&, const std::string&) { return el_connection_state::die; };
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::read);
-    };
-    cb.on_read = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::write);
-    };
-    cb.on_write = [](hope::io::event_loop::connection& conn) {
-        // Stay in read — don't close. Client disconnect will trigger EV_EOF.
-        conn.set_state(hope::io::event_loop::connection_state::read);
-    };
-    cb.on_err = [](hope::io::event_loop::connection&, const std::string&) {};
-
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
     constexpr std::size_t LARGE_SIZE = 100 * 1024;
@@ -332,30 +352,27 @@ TEST_F(TlsEventLoopTest, TlsLargeMessage) {
     std::this_thread::sleep_for(100ms);
 }
 
-// Test TLS handshake failure with raw TCP (no TLS)
 TEST_F(TlsEventLoopTest, TlsHandshakeFail) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
-    cfg.epoll_timeout = 100;
-
     std::atomic<int> error_count{0};
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [](hope::io::event_loop::connection&) {};
-    cb.on_read = [](hope::io::event_loop::connection&) {};
-    cb.on_write = [](hope::io::event_loop::connection&) {};
-    cb.on_err = [&error_count](hope::io::event_loop::connection&, const std::string&) {
+    auto on_connect = [](connection&) { return el_connection_state::read; };
+    auto on_read = [](connection&) { return el_connection_state::read; };
+    auto on_write = [](connection&) { return el_connection_state::read; };
+    auto on_err = [&error_count](connection&, const std::string&) {
         error_count++;
+        return el_connection_state::die;
     };
 
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    cfg.epoll_timeout = 100;
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
-    // Connect with raw TCP — no TLS handshake
     auto* raw = new hope::io::tcp_stream();
     raw->connect("127.0.0.1", test_port);
 
@@ -367,47 +384,34 @@ TEST_F(TlsEventLoopTest, TlsHandshakeFail) {
     delete raw;
 
     std::this_thread::sleep_for(100ms);
-
-    // The server should have detected the failed handshake
     EXPECT_GE(error_count.load(), 0);
 }
-
-// ── KTLS Event Loop Test ───────────────────────────────────────────────
 
 TEST_F(TlsEventLoopTest, KtlsFlagDoesNotBreakEventLoop) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    // Test that enable_ktls=true doesn't break the event loop — KTLS will
-    // gracefully fail to enable on unsupported kernels/ciphers, and the
-    // event loop falls back to standard SSL I/O.
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
-    cfg.enable_ktls = true;  // KTLS flag — no-op if unsupported
-
     std::atomic<int> connect_count{0};
     std::atomic<int> error_count{0};
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [&connect_count](hope::io::event_loop::connection& conn) {
+    auto on_connect = [&connect_count](connection&) {
         connect_count++;
-        conn.set_state(hope::io::event_loop::connection_state::read);
+        return el_connection_state::read;
     };
-    cb.on_read = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::write);
-    };
-    cb.on_write = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::read);
-    };
-    cb.on_err = [&error_count](hope::io::event_loop::connection&, const std::string&) {
+    auto on_read = [](connection&) { return el_connection_state::write; };
+    auto on_write = [](connection&) { return el_connection_state::read; };
+    auto on_err = [&error_count](connection&, const std::string&) {
         error_count++;
+        return el_connection_state::die;
     };
 
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    cfg.enable_ktls = true;
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
-    // Connect a TLS client and verify echo works
     auto* tcp = new hope::io::tcp_stream();
     auto* tls = new hope::io::tcp_tls_stream(tcp);
     ASSERT_NE(tls, nullptr);
@@ -435,35 +439,21 @@ TEST_F(TlsEventLoopTest, KtlsFlagDoesNotBreakEventLoop) {
     EXPECT_EQ(error_count.load(), 0);
 }
 
-// ── KTLS-Enabled Stream Test ───────────────────────────────────────────
-
 TEST_F(TlsEventLoopTest, KtlsStreamFlagDoesNotBreakConnect) {
     if (!certs_available()) {
         GTEST_SKIP() << "TLS certificates not available";
     }
 
-    // Test that a TCP TLS stream with ktls_enabled=true still connects
-    // and echoes correctly (KTLS is attempted but graceful fallback).
-    TlsEventLoopGuard guard;
-    auto cfg = make_config();
-    // Don't enable KTLS on the event loop — test the stream-level flag
+    auto on_connect = [](connection&) { return el_connection_state::read; };
+    auto on_read = [](connection&) { return el_connection_state::write; };
+    auto on_write = [](connection&) { return el_connection_state::read; };
+    auto on_err = [](connection&, const std::string&) { return el_connection_state::die; };
 
-    hope::io::event_loop::callbacks cb;
-    cb.on_connect = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::read);
-    };
-    cb.on_read = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::write);
-    };
-    cb.on_write = [](hope::io::event_loop::connection& conn) {
-        conn.set_state(hope::io::event_loop::connection_state::read);
-    };
-    cb.on_err = [](hope::io::event_loop::connection&, const std::string&) {};
-
-    guard.start(cfg, cb);
+    auto cfg = make_tls_config(test_port, cert_path(), key_path());
+    auto guard = make_tls_guard(cfg, std::move(on_connect), std::move(on_read),
+                                std::move(on_write), std::move(on_err));
     std::this_thread::sleep_for(100ms);
 
-    // Create a TLS client with the KTLS flag set
     auto* tcp = new hope::io::tcp_stream();
     auto* tls = new hope::io::tcp_tls_stream(tcp);
     ASSERT_NE(tls, nullptr);
@@ -489,4 +479,3 @@ TEST_F(TlsEventLoopTest, KtlsStreamFlagDoesNotBreakConnect) {
 }
 
 #endif
-

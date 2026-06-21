@@ -24,48 +24,53 @@ int main(int argc, char *argv[]) {
         std::cout << "TCP Event Loop Server started on port " << port << std::endl;
         std::cout << "The server will automatically create a default TCP acceptor" << std::endl;
 
+        using conn_state = hope::io::el::el_connection_state;
+
+        // Set up callbacks for the event loop
+        auto on_connect = [](auto& c) {
+            std::cout << "[CONNECT] New connection fd: " << c.descriptor << std::endl;
+            return conn_state::read;
+        };
+
+        auto on_read = [](auto& c) {
+            // Print what we received
+            const auto& buffer = c.buffer;
+            const auto chunk = buffer->peek_used();
+            std::cout << "[READ] Received " << chunk.second << " bytes from fd " << c.descriptor << std::endl;
+
+            // Echo back the data: change to write state
+            return conn_state::write;
+        };
+
+        auto on_write = [](auto& c) {
+            std::cout << "[WRITE] Echoed data to fd: " << c.descriptor << std::endl;
+
+            // Go back to read state for more data
+            return conn_state::read;
+        };
+
+        auto on_err = [](auto& c, const std::string& error) {
+            std::cout << "[ERROR] Connection fd " << c.descriptor << ": " << error << std::endl;
+            return conn_state::die;
+        };
+
+        auto* event_loop = new hope::io::el::event_loop_impl_t(
+            std::move(on_connect),
+            std::move(on_read),
+            std::move(on_write),
+            std::move(on_err)
+        );
+
         // Configure event loop - no custom_acceptor provided, so it creates a default TCP one
-        hope::io::event_loop::config cfg;
+        hope::io::el::config cfg;
         cfg.port = port;
         cfg.max_mutual_connections = 100;
         cfg.max_accepts_per_tick = 10;
         cfg.epoll_temeout = 1000;
 
-        // Set up callbacks for the event loop
-        hope::io::event_loop::callbacks callbacks;
-
-        callbacks.on_connect = [](hope::io::event_loop::connection& conn) {
-            std::cout << "[CONNECT] New connection fd: " << conn.descriptor << std::endl;
-            conn.set_state(hope::io::event_loop::connection_state::read);
-        };
-
-        callbacks.on_read = [](hope::io::event_loop::connection& conn) {
-            // Print what we received
-            const auto& buffer = conn.buffer;
-            const auto chunk = buffer->peek_used();
-            std::cout << "[READ] Received " << chunk.second << " bytes from fd " << conn.descriptor << std::endl;
-            
-            // Echo back the data: change to write state
-            conn.set_state(hope::io::event_loop::connection_state::write);
-        };
-
-        callbacks.on_write = [](hope::io::event_loop::connection& conn) {
-            std::cout << "[WRITE] Echoed data to fd: " << conn.descriptor << std::endl;
-            
-            // Go back to read state for more data
-            conn.set_state(hope::io::event_loop::connection_state::read);
-        };
-
-        callbacks.on_err = [](hope::io::event_loop::connection& conn, const std::string& error) {
-            std::cout << "[ERROR] Connection fd " << conn.descriptor << ": " << error << std::endl;
-            conn.set_state(hope::io::event_loop::connection_state::die);
-        };
-
-        auto* event_loop = new hope::io::event_loop_impl();
-
         // Run event loop in a separate thread
-        std::thread loop_thread([event_loop, &cfg, &callbacks]() {
-            event_loop->run(cfg, std::move(callbacks));
+        std::thread loop_thread([event_loop, &cfg]() {
+            event_loop->run(cfg);
         });
 
         std::cout << "Press Enter to stop the server..." << std::endl;
