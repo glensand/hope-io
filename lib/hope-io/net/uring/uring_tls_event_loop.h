@@ -11,6 +11,7 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/stream_options_util.h"
+#include "hope-io/net/tls/ktls_enable.h"
 #include "hope-io/net/uring/uring_core.h"
 
 #if PLATFORM_LINUX && HOPE_IO_URING_ENABLED
@@ -141,76 +142,76 @@ namespace hope::io::el {
 
                 struct io_uring_cqe* cqe = nullptr;
                 int ret = m_ring.wait_cqe_timeout(&cqe, 10);
-                if (ret == -ETIME) continue;
-                if (ret < 0) {
+
+                if (ret >= 0) {
+                    // CQE available — process it
+                    unsigned head, count = 0;
+                    io_uring_for_each_cqe(&m_ring.impl, head, cqe) {
+                        NAMED_SCOPE(TlsProcessOne);
+                        int res = cqe->res;
+                        uint64_t ud = io_uring_cqe_get_data64(cqe);
+                        count++;
+
+                        int fd = uring::fd_of(ud);
+                        if (fd < 0 || (std::size_t)fd >= m_connections.size()) continue;
+
+                        // Error or EOF
+                        if (res < 0 && res != -EAGAIN) {
+                            remove_connection(fd);
+                            continue;
+                        }
+
+                        if (m_pending_handshakes.count(fd)) {
+                            retry_handshake(fd);
+                            continue;
+                        }
+
+                        if (uring::is_recv(ud)) {
+                            // KTLS recv completion
+                            if (res > 0) {
+                                auto& cs = m_connections[fd];
+                                if (cs.op == active_op::recv_ktls) {
+                                    cs.op = active_op::none;
+                                    cs.conn.buffer->advance_tail((std::size_t)res);
+                                    auto state = m_callbacks.on_read(cs.conn);
+                                    apply_state(cs.conn, state);
+                                }
+                            }
+                        } else if (uring::is_send(ud)) {
+                            // KTLS send completion
+                            if (res > 0) {
+                                auto& cs = m_connections[fd];
+                                if (cs.op == active_op::send_ktls) {
+                                    cs.op = active_op::none;
+                                    cs.conn.buffer->advance_head((std::size_t)res);
+                                    if (cs.conn.buffer->is_empty()) {
+                                        auto state = m_callbacks.on_write(cs.conn);
+                                        apply_state(cs.conn, state);
+                                    } else {
+                                        submit_send_ktls(fd);
+                                    }
+                                }
+                            }
+                        } else if (uring::is_poll_in(ud)) {
+                            auto& cs = m_connections[fd];
+                            if (cs.op == active_op::poll_in) {
+                                handle_read(cs.conn);
+                            }
+                        } else if (uring::is_poll_out(ud)) {
+                            auto& cs = m_connections[fd];
+                            if (cs.op == active_op::poll_out) {
+                                handle_write(cs.conn);
+                            }
+                        }
+                    }
+                    io_uring_cq_advance(&m_ring.impl, count);
+                } else if (ret < 0 && ret != -ETIME) {
                     connection dumb;
                     m_callbacks.on_err(dumb, "uring_tls: io_uring_wait_cqe failed");
                     break;
                 }
-                if (ret == 0) continue;
 
-                unsigned head, count = 0;
-                io_uring_for_each_cqe(&m_ring.impl, head, cqe) {
-                    NAMED_SCOPE(TlsProcessOne);
-                    int res = cqe->res;
-                    uint64_t ud = io_uring_cqe_get_data64(cqe);
-                    count++;
-
-                    int fd = uring::fd_of(ud);
-                    if (fd < 0 || (std::size_t)fd >= m_connections.size()) continue;
-
-                    // Error or EOF
-                    if (res < 0 && res != -EAGAIN) {
-                        remove_connection(fd);
-                        continue;
-                    }
-
-                    if (m_pending_handshakes.count(fd)) {
-                        retry_handshake(fd);
-                        continue;
-                    }
-
-                    if (uring::is_recv(ud)) {
-                        // KTLS recv completion
-                        if (res > 0) {
-                            auto& cs = m_connections[fd];
-                            if (cs.op == active_op::recv_ktls) {
-                                cs.op = active_op::none;
-                                cs.conn.buffer->advance_tail((std::size_t)res);
-                                auto state = m_callbacks.on_read(cs.conn);
-                                apply_state(cs.conn, state);
-                            }
-                        }
-                    } else if (uring::is_send(ud)) {
-                        // KTLS send completion
-                        if (res > 0) {
-                            auto& cs = m_connections[fd];
-                            if (cs.op == active_op::send_ktls) {
-                                cs.op = active_op::none;
-                                cs.conn.buffer->advance_head((std::size_t)res);
-                                if (cs.conn.buffer->is_empty()) {
-                                    auto state = m_callbacks.on_write(cs.conn);
-                                    apply_state(cs.conn, state);
-                                } else {
-                                    submit_send_ktls(fd);
-                                }
-                            }
-                        }
-                    } else if (uring::is_poll_in(ud)) {
-                        auto& cs = m_connections[fd];
-                        if (cs.op == active_op::poll_in) {
-                            handle_read(cs.conn);
-                        }
-                    } else if (uring::is_poll_out(ud)) {
-                        auto& cs = m_connections[fd];
-                        if (cs.op == active_op::poll_out) {
-                            handle_write(cs.conn);
-                        }
-                    }
-                }
-                io_uring_cq_advance(&m_ring.impl, count);
-
-                // Submit all pending SQEs
+                // Always submit pending SQEs (even on timeout)
                 m_ring.submit();
             }
 
@@ -431,28 +432,35 @@ namespace hope::io::el {
             auto& cs = m_connections[conn.descriptor];
             bool error = false;
             bool got_data = false;
+            bool want_read = false;
 
             if (cs.tls.ktls_active) {
                 got_data = !conn.buffer->is_empty();
             } else {
-                conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
-                    ERR_clear_error();
-                    int received = SSL_read(cs.tls.ssl, data, (int)size);
-                    if (received > 0) {
-                        got_data = true;
-                        return (std::size_t)received;
-                    }
+                // Keep reading until SSL says WANT_READ (no more data available)
+                while (true) {
+                    auto consumed = conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
+                        ERR_clear_error();
+                        int received = SSL_read(cs.tls.ssl, data, (int)size);
+                        if (received > 0) {
+                            got_data = true;
+                            return (std::size_t)received;
+                        }
 
-                    int err = SSL_get_error(cs.tls.ssl, received);
-                    if (err == SSL_ERROR_WANT_READ) {
+                        int err = SSL_get_error(cs.tls.ssl, received);
+                        if (err == SSL_ERROR_WANT_READ) {
+                            want_read = true;
+                            return 0;
+                        }
+                        if (err == SSL_ERROR_ZERO_RETURN) {
+                            return 0;
+                        }
+                        error = true;
                         return 0;
-                    }
-                    if (err == SSL_ERROR_ZERO_RETURN) {
-                        return 0;
-                    }
-                    error = true;
-                    return 0;
-                });
+                    });
+                    if (consumed == 0) break;
+                    want_read = false; // consumed data, try again
+                }
             }
 
             if (got_data && !error) {
@@ -461,6 +469,10 @@ namespace hope::io::el {
             }
             if (error) {
                 remove_connection(conn.descriptor);
+            }
+            if (want_read && !got_data && !error) {
+                // SSL wants more data — resubmit poll_in
+                submit_poll_in(conn.descriptor);
             }
         }
 
@@ -471,30 +483,59 @@ namespace hope::io::el {
             auto& cs = m_connections[conn.descriptor];
 
             if (cs.tls.ktls_active) {
-                if (conn.buffer->is_empty()) {
-                    auto state = m_callbacks.on_write(conn);
-                    apply_state(conn, state);
-                }
-            } else {
+                // KTLS: sink the data with raw send
                 bool error = false;
-                conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
-                    ERR_clear_error();
-                    int sent = SSL_write(cs.tls.ssl, data, (int)size);
-                    if (sent > 0) return (std::size_t)sent;
-
-                    int err = SSL_get_error(cs.tls.ssl, sent);
-                    if (err == SSL_ERROR_WANT_WRITE) {
-                        return 0;
-                    }
-                    auto err_state = m_callbacks.on_err(conn, "SSL_write failed");
-                    error = true;
-                    apply_state(conn, err_state);
-                    return size;
-                });
-
+                while (true) {
+                    auto consumed = conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                        auto sent = ::send(conn.descriptor, (const char*)data, size, 0);
+                        if (sent > 0) return (std::size_t)sent;
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            return 0;
+                        }
+                        error = true;
+                        return size;
+                    });
+                    if (consumed == 0) break;
+                }
                 if (!error && conn.buffer->is_empty()) {
                     auto state = m_callbacks.on_write(conn);
                     apply_state(conn, state);
+                }
+                if (error) {
+                    m_callbacks.on_err(conn, "KTLS write failed");
+                    apply_state(conn, el_connection_state::die);
+                }
+            } else {
+                bool error = false;
+                bool want_write = false;
+                // Keep writing until SSL says WANT_WRITE or buffer is empty
+                while (true) {
+                    auto consumed = conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
+                        ERR_clear_error();
+                        int sent = SSL_write(cs.tls.ssl, data, (int)size);
+                        if (sent > 0) return (std::size_t)sent;
+
+                        int err = SSL_get_error(cs.tls.ssl, sent);
+                        if (err == SSL_ERROR_WANT_WRITE) {
+                            want_write = true;
+                            return 0;
+                        }
+                        error = true;
+                        return size;
+                    });
+                    if (consumed == 0) break;
+                    want_write = false;
+                }
+
+                if (error) {
+                    auto err_state = m_callbacks.on_err(conn, "SSL_write failed");
+                    apply_state(conn, err_state);
+                } else if (conn.buffer->is_empty()) {
+                    auto state = m_callbacks.on_write(conn);
+                    apply_state(conn, state);
+                } else if (want_write) {
+                    // SSL wants more room — resubmit poll_out
+                    submit_poll_out(conn.descriptor);
                 }
             }
         }
