@@ -38,6 +38,9 @@ namespace hope::io {
         void stream_in(std::string& buffer) override;
         void set_options(const stream_options& opt) override;
 
+        using stream::write;
+        using stream::read;
+
         size_t read_bytes(void* data, std::size_t length) const;
 
         void set_ktls_enabled(bool enabled) { m_ktls_enabled = enabled; }
