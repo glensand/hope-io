@@ -29,8 +29,6 @@ namespace hope::io::el {
     template<typename TOnRead, typename TOnWrite, typename TOnError, typename TConnected>
     class tls_event_loop {
     public:
-        using callbacks = typename event_loop<TOnRead, TOnWrite, TOnError, TConnected>::callbacks;
-
         virtual ~tls_event_loop() = default;
         virtual void run(const tls_config& cfg) = 0;
         virtual void stop() = 0;

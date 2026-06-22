@@ -274,23 +274,14 @@ namespace hope::io::el {
     public:
         // callbacks are part of state machine, each callback is responsible for state
         // transition (if requred), direct state setting (at connection) is not supported
-        struct callbacks final {
-            static_assert(std::is_invocable_r_v<el_connection_state, TConnected, connection&>,
-                          "TConnected must return connection_state(connection&)");
-            TConnected on_connect;
-
-            static_assert(std::is_invocable_r_v<el_connection_state, TOnRead, connection&>,
-                          "TOnRead must return connection_state(connection&)");
-            TOnRead on_read;
-
-            static_assert(std::is_invocable_r_v<el_connection_state, TOnWrite, connection&>,
-                          "TOnWrite must return connection_state(connection&)");
-            TOnWrite on_write;
-
-            static_assert(std::is_invocable_r_v<el_connection_state, TOnError, connection&, const std::string&>,
-                          "TOnError must return connection_state(connection&, const std::string&)");
-            TOnError on_err;
-        };
+        static_assert(std::is_invocable_r_v<el_connection_state, TConnected, connection&>,
+                      "TConnected must return connection_state(connection&)");
+        static_assert(std::is_invocable_r_v<el_connection_state, TOnRead, connection&>,
+                      "TOnRead must return connection_state(connection&)");
+        static_assert(std::is_invocable_r_v<el_connection_state, TOnWrite, connection&>,
+                      "TOnWrite must return connection_state(connection&)");
+        static_assert(std::is_invocable_r_v<el_connection_state, TOnError, connection&, const std::string&>,
+                      "TOnError must return connection_state(connection&, const std::string&)");
 
         virtual ~event_loop() = default;
         virtual void run(const config& cfg) = 0;

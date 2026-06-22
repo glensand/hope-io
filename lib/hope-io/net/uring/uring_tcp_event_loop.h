@@ -34,13 +34,12 @@ namespace hope::io::el {
         : public event_loop<TOnRead, TOnWrite, TOnError, TConnected> {
     public:
         using base = event_loop<TOnRead, TOnWrite, TOnError, TConnected>;
-        using callbacks = typename base::callbacks;
 
-        uring_tcp_event_loop(TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error) {
-            m_callbacks.on_connect = std::move(on_connect);
-            m_callbacks.on_read = std::move(on_read);
-            m_callbacks.on_write = std::move(on_write);
-            m_callbacks.on_err = std::move(on_error);
+        uring_tcp_event_loop(TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error)
+            : m_on_connect(std::move(on_connect))
+            , m_on_read(std::move(on_read))
+            , m_on_write(std::move(on_write))
+            , m_on_err(std::move(on_error)) {
         }
 
         ~uring_tcp_event_loop() override {
@@ -90,7 +89,7 @@ namespace hope::io::el {
                 if (ret == -ETIME) continue; // timeout, recheck m_running
                 if (ret < 0) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "uring_tcp: io_uring_wait_cqe failed");
+                    m_on_err(dumb, "uring_tcp: io_uring_wait_cqe failed");
                     break;
                 }
 
@@ -107,7 +106,7 @@ namespace hope::io::el {
                             int client_fd = res;
                             push_new_connection(client_fd);
                             auto& conn = m_connections[client_fd].conn;
-                            auto state = m_callbacks.on_connect(conn);
+                            auto state = m_on_connect(conn);
                             if (state == el_connection_state::die) {
                                 remove_connection(client_fd);
                             } else {
@@ -219,7 +218,7 @@ namespace hope::io::el {
             cs.op = active_op::none;
 
             cs.conn.buffer->advance_tail((std::size_t)res);
-            auto state = m_callbacks.on_read(cs.conn);
+            auto state = m_on_read(cs.conn);
             if (state == el_connection_state::die) {
                 remove_connection(fd);
             } else if (state == el_connection_state::write) {
@@ -243,7 +242,7 @@ namespace hope::io::el {
 
             // If buffer is fully drained, report write complete
             if (cs.conn.buffer->is_empty()) {
-                auto state = m_callbacks.on_write(cs.conn);
+                auto state = m_on_write(cs.conn);
                 if (state == el_connection_state::die) {
                     remove_connection(fd);
                 } else if (state == el_connection_state::read) {
@@ -304,11 +303,15 @@ namespace hope::io::el {
         uring::ring m_ring;
         int32_t m_listen_fd = -1;
 
+        TOnError m_on_err;
+        TOnWrite m_on_write;
+        TOnRead m_on_read;
+        TConnected m_on_connect;
+
         config m_cfg;
         buffer_pool m_pl;
         std::vector<conn_state> m_connections;
         std::atomic<bool> m_running = true;
-        callbacks m_callbacks;
     };
 
 }

@@ -41,10 +41,11 @@ namespace hope::io::el {
         : public tls_event_loop<TOnRead, TOnWrite, TOnError, TConnected> {
     public:
         using base = tls_event_loop<TOnRead, TOnWrite, TOnError, TConnected>;
-        using callbacks = typename base::callbacks;
-
         uring_tls_event_loop(TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error)
-            : m_callbacks{std::move(on_connect), std::move(on_read), std::move(on_write), std::move(on_error)} {}
+            : m_on_connect(std::move(on_connect))
+            , m_on_read(std::move(on_read))
+            , m_on_write(std::move(on_write))
+            , m_on_err(std::move(on_error)) {}
 
         ~uring_tls_event_loop() override {
             if (m_ctx) {
@@ -144,7 +145,7 @@ namespace hope::io::el {
                 if (ret == -ETIME) continue;
                 if (ret < 0) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "uring_tls: io_uring_wait_cqe failed");
+                    m_on_err(dumb, "uring_tls: io_uring_wait_cqe failed");
                     break;
                 }
                 if (ret == 0) continue;
@@ -177,7 +178,7 @@ namespace hope::io::el {
                             if (cs.op == active_op::recv_ktls) {
                                 cs.op = active_op::none;
                                 cs.conn.buffer->advance_tail((std::size_t)res);
-                                auto state = m_callbacks.on_read(cs.conn);
+                                auto state = m_on_read(cs.conn);
                                 apply_state(cs.conn, state);
                             }
                         }
@@ -189,7 +190,7 @@ namespace hope::io::el {
                                 cs.op = active_op::none;
                                 cs.conn.buffer->advance_head((std::size_t)res);
                                 if (cs.conn.buffer->is_empty()) {
-                                    auto state = m_callbacks.on_write(cs.conn);
+                                    auto state = m_on_write(cs.conn);
                                     apply_state(cs.conn, state);
                                 } else {
                                     submit_send_ktls(fd);
@@ -306,7 +307,7 @@ namespace hope::io::el {
                 if (m_cfg.enable_ktls) {
                     m_connections[sock].tls.ktls_active = try_enable_fd_ktls(ssl, sock, true);
                 }
-                auto state = m_callbacks.on_connect(m_connections[sock].conn);
+                auto state = m_on_connect(m_connections[sock].conn);
                 if (state == el_connection_state::die) {
                     remove_connection(sock);
                 } else {
@@ -338,7 +339,7 @@ namespace hope::io::el {
                 if (m_cfg.enable_ktls) {
                     cs.tls.ktls_active = try_enable_fd_ktls(cs.tls.ssl, fd, true);
                 }
-                auto state = m_callbacks.on_connect(cs.conn);
+                auto state = m_on_connect(cs.conn);
                 if (state == el_connection_state::die) {
                     remove_connection(fd);
                 } else {
@@ -356,7 +357,7 @@ namespace hope::io::el {
                     m_pending_handshakes.erase(fd);
                     ::close(fd);
                     connection dumb;
-                    m_callbacks.on_err(dumb, "uring_tls: handshake failed");
+                    m_on_err(dumb, "uring_tls: handshake failed");
                 }
             }
         }
@@ -456,7 +457,7 @@ namespace hope::io::el {
             }
 
             if (got_data && !error) {
-                auto state = m_callbacks.on_read(conn);
+                auto state = m_on_read(conn);
                 apply_state(conn, state);
             }
             if (error) {
@@ -472,7 +473,7 @@ namespace hope::io::el {
 
             if (cs.tls.ktls_active) {
                 if (conn.buffer->is_empty()) {
-                    auto state = m_callbacks.on_write(conn);
+                    auto state = m_on_write(conn);
                     apply_state(conn, state);
                 }
             } else {
@@ -486,14 +487,14 @@ namespace hope::io::el {
                     if (err == SSL_ERROR_WANT_WRITE) {
                         return 0;
                     }
-                    auto err_state = m_callbacks.on_err(conn, "SSL_write failed");
+                    auto err_state = m_on_err(conn, "SSL_write failed");
                     error = true;
                     apply_state(conn, err_state);
                     return size;
                 });
 
                 if (!error && conn.buffer->is_empty()) {
-                    auto state = m_callbacks.on_write(conn);
+                    auto state = m_on_write(conn);
                     apply_state(conn, state);
                 }
             }
@@ -541,7 +542,10 @@ namespace hope::io::el {
         std::vector<conn_state> m_connections;
         std::unordered_set<int32_t> m_pending_handshakes;
         std::atomic<bool> m_running = true;
-        callbacks m_callbacks;
+        TOnError m_on_err;
+        TOnWrite m_on_write;
+        TOnRead m_on_read;
+        TConnected m_on_connect;
     };
 
 }

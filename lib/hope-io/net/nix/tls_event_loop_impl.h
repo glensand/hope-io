@@ -41,9 +41,11 @@ namespace hope::io::el {
         : public tls_event_loop<TOnRead, TOnWrite, TOnError, TConnected> {
         using base = tls_event_loop<TOnRead, TOnWrite, TOnError, TConnected>;
     public:
-        using callbacks = typename base::callbacks;
         tls_event_loop_impl(TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error)
-            : m_callbacks{std::move(on_connect), std::move(on_read), std::move(on_write), std::move(on_error)} {}
+            : m_on_connect(std::move(on_connect))
+            , m_on_read(std::move(on_read))
+            , m_on_write(std::move(on_write))
+            , m_on_err(std::move(on_error)) {}
 
         ~tls_event_loop_impl() override {
             if (m_ctx) {
@@ -146,7 +148,7 @@ namespace hope::io::el {
 
                 if (nfds < 0) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "tls_event_loop: kevent() failed");
+                    m_on_err(dumb, "tls_event_loop: kevent() failed");
                     break;
                 }
 
@@ -225,7 +227,7 @@ namespace hope::io::el {
                 flags |= O_NONBLOCK;
                 if (fcntl(sock, F_SETFL, flags) == -1) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "tls_event_loop: cannot set nonblock");
+                    m_on_err(dumb, "tls_event_loop: cannot set nonblock");
                     ::close(sock);
                     continue;
                 }
@@ -235,7 +237,7 @@ namespace hope::io::el {
                 SSL* ssl = SSL_new(m_ctx);
                 if (!ssl) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "tls_event_loop: SSL_new failed");
+                    m_on_err(dumb, "tls_event_loop: SSL_new failed");
                     ::close(sock);
                     continue;
                 }
@@ -255,7 +257,7 @@ namespace hope::io::el {
                 if (ret == 1) {
                     register_connection(sock, ssl);
                     auto& conn = const_cast<connection&>(*m_connections.find(sock));
-                    auto state = m_callbacks.on_connect(conn);
+                    auto state = m_on_connect(conn);
                     if (state == el_connection_state::die) {
                         remove_connection(sock);
                         continue;
@@ -285,7 +287,7 @@ namespace hope::io::el {
                 m_pending_handshakes.erase(sock);
                 register_connection(sock, tls.ssl);
                 auto& conn = const_cast<connection&>(*m_connections.find(sock));
-                auto state = m_callbacks.on_connect(conn);
+                auto state = m_on_connect(conn);
                 if (state == el_connection_state::die) {
                     remove_connection(sock);
                     return;
@@ -303,7 +305,7 @@ namespace hope::io::el {
                     kevent(m_kq, &del, 1, nullptr, 0, nullptr);
                     ::close(sock);
                     connection dumb;
-                    m_callbacks.on_err(dumb, "tls_event_loop: handshake failed");
+                    m_on_err(dumb, "tls_event_loop: handshake failed");
                 }
             }
         }
@@ -340,7 +342,7 @@ namespace hope::io::el {
                     if (err == SSL_ERROR_ZERO_RETURN) {
                         return 0;
                     }
-                    m_callbacks.on_err(conn, "SSL_read failed");
+                    m_on_err(conn, "SSL_read failed");
                     error = true;
                     return 0;
                 });
@@ -349,7 +351,7 @@ namespace hope::io::el {
             }
 
             if (got_data && !error) {
-                auto state = m_callbacks.on_read(conn);
+                auto state = m_on_read(conn);
                 apply_state(conn, state);
             }
             if (error) {
@@ -372,13 +374,13 @@ namespace hope::io::el {
                 if (err == SSL_ERROR_WANT_WRITE) {
                     return 0;
                 }
-                m_callbacks.on_err(conn, "SSL_write failed");
+                m_on_err(conn, "SSL_write failed");
                 apply_state(conn, el_connection_state::die);
                 return size;
             });
 
             if (conn.buffer->is_empty()) {
-                auto state = m_callbacks.on_write(conn);
+                auto state = m_on_write(conn);
                 apply_state(conn, state);
             }
         }
@@ -437,7 +439,10 @@ namespace hope::io::el {
         std::unordered_set<int32_t> m_pending_handshakes;
         buffer_pool m_pl;
         std::atomic<bool> m_running = true;
-        callbacks m_callbacks;
+        TOnError m_on_err;
+        TOnWrite m_on_write;
+        TOnRead m_on_read;
+        TConnected m_on_connect;
     };
 
 }

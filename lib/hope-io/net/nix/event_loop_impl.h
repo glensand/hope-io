@@ -36,10 +36,12 @@ namespace hope::io::el {
         : public event_loop<TOnRead, TOnWrite, TOnError, TConnected> {
     public:
         using base = event_loop<TOnRead, TOnWrite, TOnError, TConnected>;
-        using callbacks = typename base::callbacks;
 
         event_loop_impl_t(TConnected&& on_connect, TOnRead&& on_read, TOnWrite&& on_write, TOnError&& on_error)
-            : m_callbacks{std::move(on_connect), std::move(on_read), std::move(on_write), std::move(on_error)} {}
+            : m_on_connect(std::move(on_connect))
+            , m_on_read(std::move(on_read))
+            , m_on_write(std::move(on_write))
+            , m_on_err(std::move(on_error)) {}
 
         ~event_loop_impl_t() override {
             if (m_kq != -1) ::close(m_kq);
@@ -67,7 +69,7 @@ namespace hope::io::el {
             m_kq = kqueue();
             if (m_kq == -1) {
                 connection dumb;
-                m_callbacks.on_err(dumb, "kqueue() failed");
+                m_on_err(dumb, "kqueue() failed");
                 return;
             }
 
@@ -75,7 +77,7 @@ namespace hope::io::el {
             EV_SET(&ev, (uint64_t)m_acceptor->raw(), EVFILT_READ, EV_ADD, 0, 0, nullptr);
             if (kevent(m_kq, &ev, 1, nullptr, 0, nullptr) == -1) {
                 connection dumb;
-                m_callbacks.on_err(dumb, "kevent: cannot register listen socket");
+                m_on_err(dumb, "kevent: cannot register listen socket");
                 return;
             }
 
@@ -96,7 +98,7 @@ namespace hope::io::el {
 
                 if (nfds < 0) {
                     connection dumb;
-                    m_callbacks.on_err(dumb, "kevent() failed");
+                    m_on_err(dumb, "kevent() failed");
                     m_running = false;
                 } else {
                     for (int i = 0; i < nfds; ++i) {
@@ -182,7 +184,7 @@ namespace hope::io::el {
                 flags |= O_NONBLOCK;
                 if (fcntl(sock, F_SETFL, flags) == -1) {
                     connection dumb{ -1 };
-                    m_callbacks.on_err(dumb, "Cannot set flags for connection, skip this one");
+                    m_on_err(dumb, "Cannot set flags for connection, skip this one");
                     ::close(sock);
                     continue;
                 }
@@ -193,14 +195,14 @@ namespace hope::io::el {
                 EV_SET(&ev, sock, EVFILT_READ, EV_ADD, 0, 0, nullptr);
                 if (kevent(m_kq, &ev, 1, nullptr, 0, nullptr) == -1) {
                     connection dumb{ -1 };
-                    m_callbacks.on_err(dumb, "kevent: cannot register new connection");
+                    m_on_err(dumb, "kevent: cannot register new connection");
                     ::close(sock);
                     continue;
                 }
 
                 auto& conn = const_cast<connection&>(*m_connections.emplace(sock).first);
                 conn.buffer = m_pl.allocate();
-                auto state = m_callbacks.on_connect(conn);
+                auto state = m_on_connect(conn);
                 if (state == el_connection_state::die) {
                     do_remove_connection(sock);
                     continue;
@@ -220,7 +222,7 @@ namespace hope::io::el {
             conn.buffer->consume_free([&](void* data, std::size_t size) -> std::size_t {
                 auto received = ::recv(conn.descriptor, (char*)data, size, 0);
                 if (received <= 0 && errno != EAGAIN) {
-                    auto err_state = m_callbacks.on_err(conn, "Cannot read from socket, close connection");
+                    auto err_state = m_on_err(conn, "Cannot read from socket, close connection");
                     error = true;
                     apply_state(conn, err_state);
                     return size;
@@ -230,7 +232,7 @@ namespace hope::io::el {
                 return (std::size_t)received;
             });
             if (!error && !conn.buffer->is_empty()) {
-                auto state = m_callbacks.on_read(conn);
+                auto state = m_on_read(conn);
                 if (state != el_connection_state::idle) {
                     apply_state(conn, state);
                 }
@@ -243,7 +245,7 @@ namespace hope::io::el {
             conn.buffer->consume_used([&](const void* data, std::size_t size) -> std::size_t {
                 auto op_res = send(conn.descriptor, (char*)data, size, 0);
                 if (op_res <= 0 && errno != EAGAIN) {
-                    auto err_state = m_callbacks.on_err(conn, "Cannot write to socket, close connection");
+                    auto err_state = m_on_err(conn, "Cannot write to socket, close connection");
                     apply_state(conn, err_state);
                     return size;
                 } else if (op_res <= 0) {
@@ -252,7 +254,7 @@ namespace hope::io::el {
                 return (std::size_t)op_res;
             });
             if (conn.buffer->is_empty()) {
-                auto state = m_callbacks.on_write(conn);
+                auto state = m_on_write(conn);
                 if (state != el_connection_state::idle) {
                     apply_state(conn, state);
                 }
@@ -268,7 +270,10 @@ namespace hope::io::el {
         hope::io::acceptor* m_acceptor = nullptr;
         bool m_owns_acceptor = false;
         std::atomic<bool> m_running = true;
-        callbacks m_callbacks;
+        TOnError m_on_err;
+        TOnWrite m_on_write;
+        TOnRead m_on_read;
+        TConnected m_on_connect;
     };
 
 }
