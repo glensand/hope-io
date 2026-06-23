@@ -14,7 +14,7 @@
 #include "hope-io/net/tls/ktls_enable.h"
 #include "hope-io/net/uring/uring_core.h"
 
-#if PLATFORM_LINUX && HOPE_IO_URING_ENABLED
+#if PLATFORM_LINUX
 
 #include <vector>
 #include <unordered_set>

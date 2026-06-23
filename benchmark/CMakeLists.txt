@@ -39,10 +39,6 @@ foreach(source ${BENCH_SOURCES})
     target_compile_definitions(${target_name} PRIVATE PLATFORM_LINUX=0 PLATFORM_APPLE=0 PLATFORM_WINDOWS=1)
   endif()
 
-  # io_uring availability (must match lib/CMakeLists.txt)
-  if(LIBURING_LIB)
-    target_compile_definitions(${target_name} PRIVATE HOPE_IO_URING_ENABLED=1)
-  endif()
 
   message("benchmark/ ${target_name}: linking BoringSSL")
 endforeach()
