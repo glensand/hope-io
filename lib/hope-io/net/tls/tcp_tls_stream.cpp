@@ -258,23 +258,22 @@ namespace hope::io {
 
 }
 
-namespace {
+namespace hope::io {
 
     // Shared SSL_CTX for all client connections.
-    ssl_ctx_st* get_shared_client_context() {
+    ssl_ctx_st* init_client_tls_context() {
         static ssl_ctx_st* ctx = [] {
             auto* method = TLS_client_method();
             auto* c = SSL_CTX_new(method);
             if (c) {
                 SSL_CTX_set_verify(c, SSL_VERIFY_NONE, nullptr);
                 SSL_CTX_set_session_cache_mode(c,
-                    SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL_LOOKUP);
+                    SSL_SESS_CACHE_CLIENT | SSL_SESS_CACHE_NO_INTERNAL);
                 SSL_CTX_sess_set_cache_size(c, 128);
 
                 // Optimise for speed: prefer ECDHE over DHE, prefer X25519
+                // TLS 1.3 ciphers are always enabled in BoringSSL.
                 SSL_CTX_set_cipher_list(c,
-                    "TLS_AES_128_GCM_SHA256:"
-                    "TLS_AES_256_GCM_SHA384:"
                     "ECDHE-ECDSA-AES128-GCM-SHA256:"
                     "ECDHE-ECDSA-AES256-GCM-SHA384:"
                     "ECDHE-RSA-AES128-GCM-SHA256:"
@@ -286,14 +285,10 @@ namespace {
         return ctx;
     }
 
-}
-
-namespace hope::io {
-
     void tcp_tls_stream::connect(std::string_view ip, std::size_t port) {
         m_tcp_stream->connect(ip, port);
 
-        m_context = get_shared_client_context();
+        m_context = init_client_tls_context();
         if (m_context == nullptr) {
             throw std::runtime_error("hope-io/tcp_tls_stream: cannot create context");
         }

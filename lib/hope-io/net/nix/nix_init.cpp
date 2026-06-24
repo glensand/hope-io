@@ -11,15 +11,20 @@
 #if PLATFORM_LINUX || PLATFORM_APPLE
 
 #include "hope-io/net/init.h"
-
 #include <csignal>
+#include "openssl/ssl.h"
 
 namespace hope::io {
 
+    // Shared SSL_CTX for all client connections.
+    ssl_ctx_st* init_client_tls_context();
+
     void init() {
         // Prevent SIGPIPE from killing the process when send() targets a closed socket.
-        // Without this, write() throws never fire — the process dies silently.
         signal(SIGPIPE, SIG_IGN);
+
+        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, nullptr);
+        init_client_tls_context();
     }
 
     void deinit() {

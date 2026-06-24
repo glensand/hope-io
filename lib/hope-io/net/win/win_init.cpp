@@ -15,18 +15,23 @@
 #pragma comment(lib, "ws2_32.lib")
 #include <stdexcept>
 #include <mutex>
+#include "openssl/ssl.h"
 
 namespace hope::io {
 
+    // Shared SSL_CTX for all client connections.
+    ssl_ctx_st* init_client_tls_context();
+
     static int initialized{ 0 };
     static std::mutex guard;
-    
+
     void init() {
         std::lock_guard lock(guard);
         if (initialized == 0) {
             WSADATA wsa_data;
             if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0)
                 throw std::runtime_error("hope-io/win_init: cannot initialize WSA");
+            OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, nullptr);
         }
         ++initialized;
     }
@@ -38,7 +43,6 @@ namespace hope::io {
             WSACleanup();
         }
     }
-
 }
 
 #endif

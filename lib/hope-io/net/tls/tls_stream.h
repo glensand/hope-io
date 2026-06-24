@@ -9,7 +9,6 @@
 #pragma once
 
 #include "hope-io/net/stream.h"
-#include "hope-io/net/tls/tls_init.h"
 #include "hope-io/coredefs.h"
 
 namespace hope::io { class tcp_stream; }

@@ -12,7 +12,6 @@
 #include "hope-io/net/tls_event_loop.h"
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/stream_options_util.h"
-#include "hope-io/net/tls/tls_init.h"
 
 #if PLATFORM_APPLE
 

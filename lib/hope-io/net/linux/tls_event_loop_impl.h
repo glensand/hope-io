@@ -13,7 +13,6 @@
 #include "hope-io/net/event_loop.h"
 #include "hope-io/net/linux/event_loop_impl.h"
 #include "hope-io/net/stream_options_util.h"
-#include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/ktls_enable.h"
 
 #if PLATFORM_LINUX

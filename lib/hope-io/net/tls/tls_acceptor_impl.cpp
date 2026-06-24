@@ -9,11 +9,15 @@
 #include "hope-io/net/acceptor.h"
 #include "hope-io/net/stream.h"
 #include "hope-io/net/init.h"
-#include "hope-io/net/tls/tls_init.h"
 #include "hope-io/net/tls/tls_stream.h"
 #include "hope-io/net/tls/tls_server_stream.h"
 #include "hope-io/net/tls/tls_acceptor_impl.h"
 #include "hope-io/net/tls/ktls_enable.h"
+
+namespace hope::io {
+    void init_tls();
+    void deinit_tls();
+}
 
 #if PLATFORM_LINUX || PLATFORM_APPLE
 #include "hope-io/net/nix/tcp_acceptor.h"
