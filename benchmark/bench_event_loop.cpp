@@ -41,7 +41,7 @@
 #include <functional>
 #include <cstring>
 
-#if HOPE_IO_URING_ENABLED
+#if PLATFORM_LINUX
 #include <liburing.h>
 #endif
 
@@ -197,7 +197,7 @@ static void run_uring_tcp_clients(
     std::vector<thread_buf>& bufs)
 {
     int num_threads = std::min(cfg.num_threads, cfg.connections);
-#if HOPE_IO_URING_ENABLED
+#if PLATFORM_LINUX
     std::vector<std::thread> workers;
 
     for (int t = 0; t < num_threads; ++t) {

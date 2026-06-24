@@ -12,7 +12,7 @@
 #include "hope-io/net/stream_options_util.h"
 #include "hope-io/net/uring/uring_core.h"
 
-#if PLATFORM_LINUX && HOPE_IO_URING_ENABLED
+#if PLATFORM_LINUX
 
 #include <vector>
 #include <atomic>
