@@ -14,11 +14,6 @@
 #include "hope-io/net/tls/tls_acceptor_impl.h"
 #include "hope-io/net/tls/ktls_enable.h"
 
-namespace hope::io {
-    void init_tls();
-    void deinit_tls();
-}
-
 #if PLATFORM_LINUX || PLATFORM_APPLE
 #include "hope-io/net/nix/tcp_acceptor.h"
 #include "hope-io/net/nix/tcp_stream.h"
@@ -63,11 +58,10 @@ namespace hope::io {
         : m_key(key.data())
         , m_cert(cert.data())
         , m_opts(opts) {
-        init_tls();
+        hope::io::init();
     }
 
     tls_acceptor_impl::~tls_acceptor_impl() {
-        deinit_tls();
     }
 
     void tls_acceptor_impl::open(std::size_t port) {

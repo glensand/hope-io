@@ -15,7 +15,6 @@
 #include "hope-io/net/linux/tls_event_loop_impl.h"
 #include "hope-io/net/tls/tcp_tls_stream.h"
 #include "hope-io/net/init.h"
-#include "hope-io/net/tls/tls_init.h"
 #include <thread>
 #include <chrono>
 #include <atomic>
@@ -102,7 +101,7 @@ protected:
     void SetUp() override {
         static std::atomic<int> port_counter{20000};
         test_port = port_counter.fetch_add(1);
-        hope::io::init_tls();
+        hope::io::init();
     }
 
     void TearDown() override {

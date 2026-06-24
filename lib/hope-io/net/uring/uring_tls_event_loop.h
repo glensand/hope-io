@@ -13,6 +13,7 @@
 #include "hope-io/net/stream_options_util.h"
 #include "hope-io/net/tls/ktls_enable.h"
 #include "hope-io/net/uring/uring_core.h"
+#include "hope-io/net/init.h"
 
 #if PLATFORM_LINUX
 
@@ -65,7 +66,7 @@ namespace hope::io::el {
         void run(const tls_config& cfg) override {
             THREAD_SCOPE(TLS_EVENT_LOOP_THREAD);
 
-            init_tls();
+            hope::io::init();
             auto* method = TLS_server_method();
             m_ctx = SSL_CTX_new(method);
             if (!m_ctx) {
