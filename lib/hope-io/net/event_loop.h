@@ -40,45 +40,35 @@ namespace hope::io::el {
     // Ring buffer with unbounded head/tail counters (no modulo on hot path).
     // buffer_size is a power of 2, so masking (& mask) replaces modulo (% size).
     // Layout: [ ... used ... | ... free ... ]  or  [ ... free ... used ... ]
+    // Buffer is circular, with free space wrapping around to the start when full.
+    // Buffer is not overwriting old data.
     struct fixed_size_buffer final {
-        constexpr static auto buffer_size = 512 * 1024; // 512 KB = 2^19
+        constexpr static std::size_t buffer_size = 512 * 1024; // 512 KB = 2^19
         constexpr static auto buffer_mask = buffer_size - 1; // for &-based wrapping
         using buffer_impl = std::array<unsigned char, buffer_size>;
 
         std::size_t write(const void* data, std::size_t size) noexcept {
-            auto available = free_space();
-            if (size > available) size = available;
-
-            auto t = m_tail & buffer_mask;
-            auto first_part = std::min(size, buffer_size - t);
-            std::copy((const unsigned char*)data,
-                      (const unsigned char*)data + first_part,
-                      m_impl.data() + t);
-            if (first_part < size) {
-                std::copy((const unsigned char*)data + first_part,
-                          (const unsigned char*)data + size,
-                          m_impl.data());
-            }
-            m_tail += size;
-            return size;
+            auto remaining = size;
+            auto* src = (char*)(data);
+            return consume_free([&](void* buf, std::size_t capacity) {
+                auto n = std::min(capacity, remaining);
+                std::memcpy(buf, src, n);
+                src += n;
+                remaining -= n;
+                return n;
+            });
         }
 
         std::size_t read(void* data, std::size_t size) noexcept {
-            auto available = count();
-            if (size > available) size = available;
-
-            auto h = m_head & buffer_mask;
-            auto first_part = std::min(size, buffer_size - h);
-            std::copy(m_impl.data() + h,
-                      m_impl.data() + h + first_part,
-                      (unsigned char*)data);
-            if (first_part < size) {
-                std::copy(m_impl.data(),
-                          m_impl.data() + (size - first_part),
-                          (unsigned char*)data + first_part);
-            }
-            m_head += size;
-            return size;
+            auto remaining = size;
+            auto* dst = (char*)(data);
+            return consume_used([&](const void* buf, std::size_t length) {
+                auto n = std::min(length, remaining);
+                std::memcpy(dst, buf, n);
+                dst += n;
+                remaining -= n;
+                return n;
+            });
         }
 
         // Calls fn with each contiguous free region and advances tail by the return value.
@@ -87,26 +77,21 @@ namespace hope::io::el {
         // Returns total bytes written across all regions.
         template<typename F>
         std::size_t consume_free(F&& fn) noexcept {
-            if (m_tail - m_head >= buffer_size) return 0; // full
+            if (m_tail - m_head == buffer_size) return 0; // full
 
-            auto h = m_head & buffer_mask;
-            auto t = m_tail & buffer_mask;
-
-            // First contiguous free region: starts at physical tail
-            auto chunk_size = (h > t) ? (h - t) : (buffer_size - t);
+            auto cur_free_space = free_space();
             std::size_t total = 0;
-            if (chunk_size > 0) {
+            while (cur_free_space > 0) {
+                auto h = m_head & buffer_mask;
+                auto t = m_tail & buffer_mask;
+                auto end = std::min(t + cur_free_space, buffer_size);
+                auto chunk_size = end - t;
                 auto consumed = fn(m_impl.data() + t, chunk_size);
-                m_tail += consumed;
+                assert(consumed <= cur_free_space);
                 total += consumed;
+                m_tail += consumed;
                 if (consumed < chunk_size) return total;
-            }
-
-            // Second region: only if tail wrapped past buffer end and head > 0
-            if (h > 0 && (m_tail & buffer_mask) == 0) {
-                auto consumed = fn(m_impl.data(), h);
-                m_tail += consumed;
-                total += consumed;
+                cur_free_space -= consumed;
             }
 
             return total;
@@ -120,24 +105,18 @@ namespace hope::io::el {
         std::size_t consume_used(F&& fn) noexcept {
             if (m_tail == m_head) return 0; // empty
 
-            auto h = m_head & buffer_mask;
-            auto t = m_tail & buffer_mask;
-
-            // First contiguous used region: starts at physical head
-            auto chunk_size = (h <= t) ? (t - h) : (buffer_size - h);
+            auto cur_count = count();
             std::size_t total = 0;
-            if (chunk_size > 0) {
-                auto consumed = fn(static_cast<const void*>(m_impl.data() + h), chunk_size);
-                m_head += consumed;
+            while (cur_count > 0) {
+                auto h = m_head & buffer_mask;
+                auto end = std::min(h + cur_count, buffer_size);
+                auto chunk_size = end - h;
+                auto consumed = fn(m_impl.data() + h, chunk_size);
+                assert(consumed <= cur_count);
                 total += consumed;
+                m_head += consumed;
                 if (consumed < chunk_size) return total;
-            }
-
-            // Second region: only if head wrapped past buffer end and tail > 0
-            if (t > 0 && (m_head & buffer_mask) == 0) {
-                auto consumed = fn(static_cast<const void*>(m_impl.data()), t);
-                m_head += consumed;
-                total += consumed;
+                cur_count -= consumed;
             }
 
             return total;
@@ -178,11 +157,7 @@ namespace hope::io::el {
         // Returns the first contiguous used region without advancing head.
         // Useful for protocol parsers that peek at data before consuming.
         std::pair<const void*, std::size_t> peek_used() const noexcept {
-            if (m_tail == m_head) return { nullptr, 0 };
-            auto h = m_head & buffer_mask;
-            auto t = m_tail & buffer_mask;
-            if (h <= t) return { m_impl.data() + h, t - h };
-            return { m_impl.data() + h, buffer_size - h };
+            return get_used_region();
         }
 
         void reset() noexcept {
@@ -195,8 +170,9 @@ namespace hope::io::el {
         }
 
         std::size_t count() const noexcept {
+            assert(m_tail - m_head <= buffer_size);
             auto c = m_tail - m_head;
-            return c > buffer_size ? buffer_size : c;
+            return c;
         }
 
         std::size_t free_space() const noexcept {
